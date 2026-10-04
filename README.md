@@ -24,7 +24,7 @@ It is built to be cheap for the agent. One small index to read, one file per tas
 Measured on a real project with 165 tasks, converted from a single markdown index:
 
 | | Before | After |
-|---|---|---|
+| --- | --- | --- |
 | Read at the start of every session | 197 KB index | 94-byte catalog + 1.7 KB of rules |
 | Read to start one task | the index, then the task's section | one file, 2 KB at the median |
 | Marking a task done | a status cell, plus a ✅ at every reference to it (median 12 places) | one frontmatter line |
@@ -33,7 +33,7 @@ Measured on a real project with 165 tasks, converted from a single markdown inde
 
 ## What you get
 
-```
+```text
 docs/
   index.md       catalog of the wiki, one line per page
   log.md         append-only history
@@ -57,7 +57,7 @@ npx superwiki install claude
 This copies the skills into the folder your agent reads. Name one or more targets:
 
 | Target | Installs into | For |
-|---|---|---|
+| --- | --- | --- |
 | `claude` | `~/.claude/skills` | [Claude Code](#claude-code) |
 | `codex` | `~/.agents/skills` | [Codex CLI](#codex-cli) |
 | `copilot` | `~/.copilot/skills` | [GitHub Copilot CLI](#github-copilot-cli) |
@@ -226,7 +226,7 @@ node docs/.sw/sw.mjs snapshot               # or: freeze the vault into docs/vie
 npm test       # builds skills/sw-init/assets/sw.mjs, then runs the tests
 ```
 
-Releases are cut by the `Release` workflow (Actions → Release → Run workflow): it tests, bumps the version in `package.json` and the plugin manifests, publishes to npm, tags, and creates a GitHub release. It needs the repository secret `NPM_TOKEN`.
+Releases are cut by the `Release` workflow (Actions → Release → Run workflow): it tests, bumps the version in `package.json` and the plugin manifests, publishes to npm, tags, and creates a GitHub release. It publishes through npm trusted publishing, so no token is stored: the package's settings on npmjs.com name this repository and `release.yml` as its trusted publisher.
 
 `node scripts/build-demo.mjs` builds the public demo into `site/` (the viewer with the example vault baked in); the Pages workflow deploys it on every push to `main`.
 

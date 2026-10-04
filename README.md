@@ -153,33 +153,71 @@ A project's `docs/` folder is plain markdown and keeps working as an Obsidian va
 
 ## Use
 
+| Skill | What it does |
+| --- | --- |
+| `sw-init` | set up `docs/` in the current project, or upgrade it |
+| `sw-migrate` | convert an existing table-based task index, on a new git branch |
+| `sw-ingest` | file a source into the wiki |
+| `sw-plan` | plan a task with the planner subagent and get your approval |
+| `sw-implement` | run a task with the implementer subagent and record the result |
+| `sw-explain` | explain a task: what, why, dependencies, what it unblocks |
+| `sw-triage` | for a problem: seen before? lessons, likely causes |
+| `sw-lint` | structural checks by script, semantic review on request |
+| `sw-visualize` | open the viewer |
+| `sw-config` | the model each tool uses for planning and implementing; task areas |
+
+### Examples
+
+Shown as typed in Claude Code. In Codex, write `$sw-plan` instead of `/sw-plan`. Task ids are an area prefix and a number, such as `P-15`.
+
+```text
+/sw-init                          set up the vault; asks whether you want tasks
+/sw-migrate                       convert the task tables this project already has
+
+/sw-plan                          what can start now? pick one and plan it
+/sw-plan P-15                     plan task P-15 (a small task is sent straight to sw-implement)
+/sw-plan add CSV export to the sources page
+                                  new work: creates the task, then plans it
+
+/sw-implement P-15                run P-15; refuses if a dependency is not done
+/sw-implement                     continue what is in progress, or pick a ready task
+
+/sw-explain M-06                  what M-06 is, why it exists, what it waits on and unblocks
+/sw-triage photo uploads hang at 100% on mobile since yesterday
+                                  has this happened before? lessons and likely causes
+/sw-ingest ~/Downloads/interview-notes.md
+                                  file a source and summarise it into the wiki
+
+/sw-config plan with opus, implement with sonnet
+/sw-lint                          check links, frontmatter and task dependencies
+/sw-visualize                     open the task board and the wiki in the browser
 ```
-sw-init        set up docs/ in the current project
-sw-migrate     convert an existing table-based task index, on a new git branch
-sw-ingest      file a source from docs/raw/ into the wiki
-sw-plan        plan a task with a planner subagent, save the approved plan
-sw-implement   run a task with an implementer subagent, record the result
-sw-explain     explain a task: what, why, dependencies, what it unblocks
-sw-triage      for a problem: seen before? lessons, likely causes
-sw-lint        structural checks by script, semantic review on request
-sw-visualize   open the viewer
-sw-config      models per role and tool, task areas
+
+You do not have to type a command. The rules `sw-init` adds to `AGENTS.md` tell the agent which skill fits, so a plain request should reach the same skill:
+
+```text
+What should I work on next?
+Implement P-15.
+Why does M-06 exist, and what is it blocked by?
+Users get the magic-link email twice. Have we seen this before?
 ```
 
 A filled-in example vault is in [examples/demo/docs](examples/demo/docs).
 
-After that, from the project root:
+### The CLI
+
+The skills call a small script that answers questions without the agent reading the vault. You can run it yourself, from the project root:
 
 ```bash
-node docs/.sw/sw.mjs status        # counts per area
-node docs/.sw/sw.mjs ready         # tasks that can start now
-node docs/.sw/sw.mjs check M-01    # what blocks this task
-node docs/.sw/sw.mjs explain M-01  # its place in the dependency chain
-node docs/.sw/sw.mjs search sync timeout   # where something is mentioned
-node docs/.sw/sw.mjs next-id M     # next free id
-node docs/.sw/sw.mjs lint          # broken links, bad frontmatter, dependency errors
-node docs/.sw/sw.mjs serve --open  # the viewer, reading files live
-node docs/.sw/sw.mjs snapshot      # or: freeze the vault into docs/viewer.html, no server
+node docs/.sw/sw.mjs status                 # counts per area
+node docs/.sw/sw.mjs ready                  # tasks that can start now
+node docs/.sw/sw.mjs check P-15             # can it start or finish, and what is open
+node docs/.sw/sw.mjs explain P-15           # dependencies, what it unblocks, plan, area guide
+node docs/.sw/sw.mjs search sync timeout    # where something is mentioned
+node docs/.sw/sw.mjs next-id P              # next free id in an area
+node docs/.sw/sw.mjs lint                   # broken links, bad frontmatter, dependency errors
+node docs/.sw/sw.mjs serve --open           # the viewer, reading files live
+node docs/.sw/sw.mjs snapshot               # or: freeze the vault into docs/viewer.html, no server
 ```
 
 ## Develop

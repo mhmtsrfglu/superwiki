@@ -10,9 +10,7 @@ Agent skills that turn a project's `docs/` folder into an **LLM-maintained wiki 
 </picture>
 
 ```bash
-export SUPERWIKI_HOME=~/.superwiki
-git clone https://github.com/mhmtsrfglu/superwiki "$SUPERWIKI_HOME"
-"$SUPERWIKI_HOME"/install.sh claude        # or: codex, copilot, global, all
+npx superwiki install claude        # or: codex, copilot, global, all
 ```
 
 Then, in a project: `/sw-init`.
@@ -50,15 +48,13 @@ docs/
 
 ## Install
 
-Requires Node 18 or newer, because the skills call small scripts.
+Requires Node 18 or newer.
 
 ```bash
-export SUPERWIKI_HOME=~/.superwiki                      # where Superwiki lives; any folder works
-git clone https://github.com/mhmtsrfglu/superwiki "$SUPERWIKI_HOME"
-"$SUPERWIKI_HOME"/install.sh claude              # or: codex, copilot, global, all
+npx superwiki install claude
 ```
 
-`install.sh` links the skills into the folder your agent reads. Name one or more targets:
+This copies the skills into the folder your agent reads. Name one or more targets:
 
 | Target | Installs into | For |
 |---|---|---|
@@ -69,21 +65,31 @@ git clone https://github.com/mhmtsrfglu/superwiki "$SUPERWIKI_HOME"
 | `all` | all of the above | |
 
 ```bash
-"$SUPERWIKI_HOME"/install.sh claude codex                   # several agents at once
-"$SUPERWIKI_HOME"/install.sh --project ~/code/my-app all    # one project only, not your home folder
-"$SUPERWIKI_HOME"/install.sh --copy claude                  # copy instead of link
-"$SUPERWIKI_HOME"/install.sh --uninstall claude             # remove
-"$SUPERWIKI_HOME"/install.sh --help
+npx superwiki install claude codex                   # several agents at once
+npx superwiki install --project ~/code/my-app all    # one project only, not your home folder
+npx superwiki uninstall claude                       # remove
+npx superwiki --help
 ```
 
-`SUPERWIKI_HOME` only tells the commands above where the clone is; the installer itself finds the repository it sits in. Start a new agent session after installing: a running session does not pick up new skills.
+Start a new agent session after installing: a running session does not pick up new skills.
+
+### From a clone
+
+If you would rather read the code first, or want to change it:
+
+```bash
+git clone https://github.com/mhmtsrfglu/superwiki ~/.superwiki
+~/.superwiki/install.sh claude            # same targets and options; links instead of copying
+```
+
+A linked install follows the clone: `git pull` updates every agent. `install.sh --copy` copies instead, `--uninstall` removes.
 
 All three agents below were checked the same way: the agent found the skills, refused to start a task with an unfinished dependency, and ran `sw-plan` end to end with the planner subagent.
 
 ### Claude Code
 
 ```bash
-"$SUPERWIKI_HOME"/install.sh claude
+npx superwiki install claude
 ```
 
 Invoke with a slash: `/sw-init`, `/sw-plan T-01`.
@@ -95,7 +101,7 @@ Claude Code reads `~/.claude/skills/` (and a project's `.claude/skills/`); it do
 ### Codex CLI
 
 ```bash
-"$SUPERWIKI_HOME"/install.sh codex
+npx superwiki install codex
 ```
 
 Invoke with a dollar sign, or by name in a sentence: `$sw-init`, `$sw-plan T-01`, "use the sw-plan skill for T-01". Checked with CLI 0.153.
@@ -105,7 +111,7 @@ A skill cannot switch Codex into plan mode; start planning yourself with `/plan`
 ### GitHub Copilot CLI
 
 ```bash
-"$SUPERWIKI_HOME"/install.sh copilot
+npx superwiki install copilot
 ```
 
 Invoke with a slash, or by name in a sentence: `/sw-init`, "use the sw-plan skill for T-01". Checked with CLI 1.0.31.
@@ -117,10 +123,10 @@ A skill cannot switch Copilot into plan mode; start with `copilot --mode plan` o
 ### Other agents
 
 ```bash
-"$SUPERWIKI_HOME"/install.sh global
+npx superwiki install global
 ```
 
-Agents that load `SKILL.md` folders from `~/.agents/skills` pick the skills up from there. For an agent with its own skills folder (Cursor, Gemini CLI, OpenCode and others), link or copy `"$SUPERWIKI_HOME"/skills/sw-*` into it by hand. Nothing has been run in these agents. What will differ:
+Agents that load `SKILL.md` folders from `~/.agents/skills` pick the skills up from there. For an agent with its own skills folder (Cursor, Gemini CLI, OpenCode and others), copy the `skills/sw-*` folders from a clone into it by hand. Nothing has been run in these agents. What will differ:
 
 - the skills name Claude Code, Codex and Copilot tools when they dispatch subagents; elsewhere they fall back to doing the planning or implementing in the main session, and say so;
 - `sw-config` writes agent files only for `claude`, `codex` and `copilot`, so a per-role model cannot be set.
@@ -137,11 +143,11 @@ Superwiki works next to planning skill sets such as Superpowers. Two things to k
 ### Update and uninstall
 
 ```bash
-git -C "$SUPERWIKI_HOME" pull                   # linked installs update with the clone
-"$SUPERWIKI_HOME"/install.sh --uninstall all
+npx superwiki@latest install claude      # update: same command, newest release
+npx superwiki uninstall all
 ```
 
-After an update, run `sw-init` again in each project: it replaces `docs/.sw/sw.mjs`, the templates and `docs/viewer.html` with the new version and keeps your content. With `--copy` installs, re-run `install.sh` as well.
+After an update, run `sw-init` again in each project: it replaces `docs/.sw/sw.mjs`, the templates and `docs/viewer.html` with the new version and keeps your content.
 
 A project's `docs/` folder is plain markdown and keeps working as an Obsidian vault without Superwiki.
 

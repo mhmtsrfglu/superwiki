@@ -1,11 +1,45 @@
 {
   "name": "superwiki",
   "version": "0.1.0",
-  "private": true,
-  "type": "module",
+  "description": "Agent skills that turn docs/ into an LLM-maintained wiki and task tracker. Obsidian-friendly. Works with Claude Code, Codex and Copilot CLI.",
+  "keywords": [
+    "claude-code",
+    "agent-skills",
+    "codex",
+    "github-copilot",
+    "obsidian",
+    "llm-wiki",
+    "knowledge-base",
+    "ai-agents",
+    "task-management",
+    "wiki"
+  ],
+  "homepage": "https://github.com/mhmtsrfglu/superwiki#readme",
+  "bugs": "https://github.com/mhmtsrfglu/superwiki/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mhmtsrfglu/superwiki.git"
+  },
   "license": "MIT",
+  "author": "Mehmet Şerefoğlu",
+  "type": "module",
+  "bin": {
+    "superwiki": "bin/superwiki.mjs"
+  },
+  "files": [
+    "bin",
+    "skills",
+    "commands",
+    ".claude-plugin",
+    ".codex-plugin",
+    "install.sh"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "build": "node scripts/build.mjs",
-    "test": "node scripts/build.mjs && node --test"
+    "test": "node scripts/build.mjs && node --test",
+    "prepublishOnly": "npm test"
   }
 }

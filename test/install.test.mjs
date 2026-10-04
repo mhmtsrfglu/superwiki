@@ -9,6 +9,8 @@ const script = new URL('../install.sh', import.meta.url).pathname;
 const repo = new URL('..', import.meta.url).pathname.replace(/\/$/, '');
 const skills = readdirSync(join(repo, 'skills')).filter(n => n.startsWith('sw-'));
 const home = () => mkdtempSync(join(tmpdir(), 'sw-home-'));
+const bin = new URL('../bin/superwiki.mjs', import.meta.url).pathname;
+const cli = (HOME, ...args) => spawnSync('node', [bin, ...args], { encoding: 'utf8', env: { ...process.env, HOME } });
 const run = (HOME, ...args) => spawnSync('bash', [script, ...args], { encoding: 'utf8', env: { ...process.env, HOME, SUPERWIKI_HOME: '' } });
 
 test('each target links every skill into the folder that agent reads', () => {
@@ -65,5 +67,23 @@ test('--project and --copy', () => {
 
 test('bad input', () => {
   assert.equal(run(home()).status, 2);
+  assert.equal(cli(home(), 'frobnicate').status, 2);
   assert.equal(run(home(), 'cursor').status, 2);
+});
+
+test('npx entry point: copies by default, updates its own copies, uninstalls them', () => {
+  const h = home();
+  const first = cli(h, 'install', 'claude', 'global');
+  assert.equal(first.status, 0, first.stderr);
+  assert.match(first.stdout, /copied {3}sw-init/);
+  for (const dir of ['.claude/skills', '.agents/skills']) {
+    assert.ok(!lstatSync(join(h, dir, 'sw-plan')).isSymbolicLink());
+    assert.ok(existsSync(join(h, dir, 'sw-init/scripts/init.mjs')));
+    assert.ok(existsSync(join(h, dir, 'sw-init/assets/sw.mjs')));
+  }
+  assert.equal(cli(h, 'install', 'claude').status, 0, 're-run replaces its own copies');
+  cli(h, 'uninstall', 'claude');
+  assert.ok(!existsSync(join(h, '.claude/skills/sw-init')));
+  assert.ok(existsSync(join(h, '.agents/skills/sw-init')));
+  assert.match(cli(h, '--version').stdout, /^\d+\.\d+\.\d+/);
 });

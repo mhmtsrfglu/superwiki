@@ -44,7 +44,7 @@ jobs:
       - name: Commit and tag
         run: |
           git config user.name "Mehmet Serefoglu"
-          git config user.email "memet.serefoglu@gmai.com"
+          git config user.email "memet.serefoglu@gmail.com"
           git add -A
           git commit -m "Release v${{ steps.version.outputs.version }}"
           git tag "v${{ steps.version.outputs.version }}"

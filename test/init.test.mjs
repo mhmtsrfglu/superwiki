@@ -20,6 +20,10 @@ test('new vault with tasks: files, schema block, clean lint', () => {
   const agents = read(root, 'AGENTS.md');
   assert.match(agents, /docs\/tasks\/<ID>\.md/);
   assert.doesNotMatch(agents, /\{\{/);
+  assert.match(agents, /Implementing a task: `sw-implement`/);
+  assert.match(agents, /`sw-triage` first/);
+  assert.match(agents, /\n\nTasks:\n\n- A task's status/);
+  assert.match(agents, /Work that belongs to no task .* one `change` entry/);
   assert.equal(read(root, 'CLAUDE.md'), '@AGENTS.md\n');
   const lint = sw(root, 'lint');
   assert.equal(lint.status, 0, lint.stdout + lint.stderr);
@@ -35,6 +39,10 @@ test('wiki-only vault leaves the task module out', () => {
   const agents = read(root, 'AGENTS.md');
   assert.doesNotMatch(agents, /tasks\/<ID>/);
   assert.match(agents, /sw\.mjs search/);
+  assert.doesNotMatch(agents, /sw-plan|sw-implement|sw-explain/);
+  assert.match(agents, /`sw-ingest`/);
+  assert.doesNotMatch(agents, /Tasks:/);
+  assert.match(agents, /When you change the project, append one `change` entry/);
 });
 
 test('re-run keeps user content and config, replaces only the managed block', () => {
@@ -85,9 +93,15 @@ test('cli: status, ready, check and lint exit code', () => {
   assert.match(sw(root, 'check', 'T-01').stdout, /can start: yes/);
   assert.equal(JSON.parse(sw(root, 'check', 'T-01', '--json').stdout).canStart, true);
   const explain = sw(root, 'explain', 'T-01').stdout;
+  assert.match(explain, /area guide: none/);
+  mkdirSync(join(root, 'docs/plans'), { recursive: true });
+  writeFileSync(join(root, 'docs/plans/T-01-plan.md'), '---\ntype: plan\ntask: T-01\nstatus: draft\n---\n');
+  assert.match(sw(root, 'check', 'T-01').stdout, /plan: docs\/plans\/T-01-plan\.md {2}\(draft, not approved\)/);
+  writeFileSync(join(root, 'docs/wiki/guide-t.md'), '---\ntype: guide\narea: T\nsummary: g\n---\n');
+  assert.match(sw(root, 'explain', 'T-01').stdout, /area guide: docs\/wiki\/guide-t\.md/);
   assert.match(explain, /depends on: none\nblocks:\n {2}T-02 \(blocked\) Task T-02\nfinishing it makes ready: T-02/);
   assert.match(sw(root, 'search', 'Task', 'T-02').stdout, /pages \(2\)[^\n]*\ndocs\/tasks\/T-02\.md {2}\[task blocked\]/);
-  assert.match(sw(root, 'snapshot').stdout, /snapshot: 4 files/);
+  assert.match(sw(root, 'snapshot').stdout, /snapshot: 6 files/);
   const snap = read(root, 'docs/.sw/data.js');
   assert.match(snap, /^window\.SW_DATA = \{"name":"sw-init-/);
   assert.equal(read(root, 'docs/.sw/.gitignore'), 'data.js\nserver.json\n');

@@ -13,8 +13,8 @@ Run everything from the project root. `<skill-dir>` is this skill's directory; `
 
 Stop and tell the user if any of these fails; do not work around them.
 
-- The project is a git repository and `git status --porcelain` is empty.
-- `docs/.sw/` does not exist (already a vault).
+- The project is a git repository, and `git status --porcelain -- docs AGENTS.md CLAUDE.md` is empty: the files this skill rewrites have no uncommitted changes. Uncommitted changes elsewhere do not block; mention them in the report so the user does not mistake them for the migration's.
+- `docs/.sw/config.json` does not exist (already a vault). Empty folders left by an earlier, undone attempt are not a vault; ignore them.
 - Node 18 or newer.
 
 ## Steps

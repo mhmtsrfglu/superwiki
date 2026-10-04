@@ -20,11 +20,11 @@ node <skill-dir>/scripts/config.mjs sync --tools claude,codex,copilot
 
 A model is chosen per role (`plan`, `implement`) and per tool (`claude`, `codex`, `copilot`), because each tool can only run its own models. No tool lets a skill change the model of the running session, so sw-plan and sw-implement hand the work to a subagent, and the subagent's file carries the model.
 
-| Tool | File the script writes | Read-only planner by |
-|---|---|---|
-| Claude Code | `.claude/agents/sw-planner.md`, `sw-implementer.md` | `tools:` list |
-| Codex | `.codex/agents/sw-planner.toml`, `sw-implementer.toml` | `sandbox_mode` |
-| Copilot CLI | `.github/agents/sw-planner.agent.md`, `sw-implementer.agent.md` | `tools:` list |
+| Tool | Files the script writes |
+|---|---|
+| Claude Code | `.claude/agents/sw-planner.md`, `sw-implementer.md` |
+| Codex | `.codex/agents/sw-planner.toml`, `sw-implementer.toml` |
+| Copilot CLI | `.github/agents/sw-planner.agent.md`, `sw-implementer.agent.md` |
 
 When the user asks to set a model:
 

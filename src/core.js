@@ -198,8 +198,8 @@ export function lint(vault) {
       if (!p.data.type) add('error', 'missing-field', p.path, 'frontmatter `type` is missing');
       if (!p.data.summary) add('warn', 'missing-field', p.path, 'frontmatter `summary` is missing');
       if (vault.index && !vault.index.links.some(l => resolve(vault, l.target) === p)) add('warn', 'not-in-index', p.path, 'page is not listed in index.md');
-      // A source summary is reachable from the index and need not be cited yet; ingest stays a three-file change.
-      if (p.data.type !== 'source' && !p.inbound.some(q => q !== vault.index && q !== vault.log)) add('warn', 'orphan-page', p.path, 'no page links here');
+      // A source summary is reachable from the index and need not be cited yet; an area guide is found by its area, not by links.
+      if (p.data.type !== 'source' && p.data.type !== 'guide' && !p.inbound.some(q => q !== vault.index && q !== vault.log)) add('warn', 'orphan-page', p.path, 'no page links here');
     }
     if (p.folder === 'plans') {
       const id = /-plan$/i.test(p.name) ? p.name.replace(/-plan$/i, '') : null;
@@ -305,4 +305,9 @@ export function search(vault, query, limit = 8) {
   // Among pages matching the same number of terms, a recorded lesson is the most useful thing to read first.
   const lesson = h => (h.page.data.type === 'lesson' ? 1 : 0);
   return out.sort((a, b) => b.matched - a.matched || lesson(b) - lesson(a) || b.score - a.score || a.page.path.localeCompare(b.page.path)).slice(0, limit);
+}
+
+// The wiki page that tells agents how to work in a task area: `type: guide`, `area: <AREA>`.
+export function guideFor(vault, area) {
+  return vault.pages.find(p => p.folder === 'wiki' && p.data.type === 'guide' && key(p.data.area ?? '') === key(area)) || null;
 }

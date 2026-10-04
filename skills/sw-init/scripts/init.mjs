@@ -79,7 +79,7 @@ keep(join(docs, 'log.md'), `# Log\n\nAppend-only. Entry format: \`## [YYYY-MM-DD
 write(join(dotdir, '.gitignore'), 'data.js\nserver.json\n');
 refresh(join(assets, 'sw.mjs'), join(dotdir, 'sw.mjs'));
 refresh(join(assets, 'viewer.html'), join(docs, 'viewer.html'));
-for (const t of ['page.md', ...(tasks ? ['task.md', 'plan.md'] : [])]) refresh(join(assets, 'templates', t), join(dotdir, 'templates', t));
+for (const t of ['page.md', ...(tasks ? ['task.md', 'plan.md', 'guide.md'] : [])]) refresh(join(assets, 'templates', t), join(dotdir, 'templates', t));
 
 const config = {
   version: 1,

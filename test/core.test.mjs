@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseFrontmatter, extractWikilinks, buildVault, lint, summary, tasksIn, nextId, taskOf, search, unblockedBy } from '../src/core.js';
+import { parseFrontmatter, extractWikilinks, buildVault, lint, summary, tasksIn, nextId, taskOf, search, unblockedBy, guideFor } from '../src/core.js';
 
 const task = (id, fields = {}, body = '') => ({
   path: `tasks/${id}.md`,
@@ -121,4 +121,12 @@ test('search: more distinct terms first, head hits outweigh body, lessons booste
   assert.deepEqual(hits.map(h => h.page.name), ['sync-timeout', 'offline-sync', 'T-01']);
   assert.match(hits[2].line, /upload timeout/);
   assert.deepEqual(search(v, 'zzz'), []);
+});
+
+test('area guide: found by area, exempt from the orphan warning', () => {
+  const files = [index('guide-p'), page('guide-p', 'Layout', 'type: guide\narea: P\nsummary: How to work in the panel.'), task('P-01'), task('M-01')];
+  const v = buildVault(files);
+  assert.equal(guideFor(v, 'p').name, 'guide-p');
+  assert.equal(guideFor(v, 'M'), null);
+  assert.deepEqual(lint(v), []);
 });

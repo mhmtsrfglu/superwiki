@@ -15,7 +15,8 @@ test('model writes agent files only for the tool it was set for', () => {
   const root = project();
   run(root, 'model', 'plan', 'claude', 'opus');
   const planner = read(root, '.claude/agents/sw-planner.md');
-  assert.match(planner, /^---\nname: sw-planner\n.*\ntools: Read, Grep, Glob\nmodel: opus\n---/s);
+  assert.match(planner, /^---\nname: sw-planner\n.*\nmodel: opus\n---/s);
+  assert.doesNotMatch(planner, /^tools:/m, 'the planner writes its plan file');
   assert.doesNotMatch(read(root, '.claude/agents/sw-implementer.md'), /^(tools|model):/m);
   assert.ok(!existsSync(join(root, '.codex')));
   assert.ok(!existsSync(join(root, '.github')));
@@ -27,10 +28,10 @@ test('codex and copilot agents carry model and read-only planner', () => {
   run(root, 'model', 'implement', 'copilot', 'gpt-6');
   const toml = read(root, '.codex/agents/sw-planner.toml');
   assert.match(toml, /name = "sw_planner"\n/);
-  assert.match(toml, /model = "gpt-6"\nsandbox_mode = "read-only"\n/);
+  assert.match(toml, /model = "gpt-6"\n/);
+  assert.doesNotMatch(toml, /sandbox_mode/);
   assert.doesNotMatch(read(root, '.codex/agents/sw-implementer.toml'), /sandbox_mode|^model/m);
   assert.match(read(root, '.github/agents/sw-implementer.agent.md'), /\nmodel: gpt-6\n---/);
-  assert.match(read(root, '.github/agents/sw-planner.agent.md'), /tools: \["read", "search"\]/);
 });
 
 test('unset, areas, show, and sw-init re-run keeps the tool list', () => {

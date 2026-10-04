@@ -188,6 +188,8 @@ node docs/.sw/sw.mjs snapshot      # or: freeze the vault into docs/viewer.html,
 npm test       # builds skills/sw-init/assets/sw.mjs, then runs the tests
 ```
 
+Releases are cut by the `Release` workflow (Actions → Release → Run workflow): it tests, bumps the version in `package.json` and the plugin manifests, publishes to npm, tags, and creates a GitHub release. It needs the repository secret `NPM_TOKEN`.
+
 `node scripts/build-demo.mjs` builds the public demo into `site/` (the viewer with the example vault baked in); the Pages workflow deploys it on every push to `main`.
 
 `src/core.js` is shared by the CLI and the viewer. Edit sources in `src/`; the files in `skills/sw-init/assets/` named `sw.mjs` and `viewer.html` are generated.

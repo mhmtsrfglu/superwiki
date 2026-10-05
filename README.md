@@ -195,8 +195,10 @@ A project's `docs/` folder is plain markdown and keeps working as an Obsidian va
 | `sw-ingest` | file a source into the wiki |
 | `sw-plan` | plan a task with the planner subagent and get your approval |
 | `sw-implement` | run a task with the implementer subagent, have it reviewed if the task asks for that, and record the result |
+| `sw-run` | work through several tasks in a row, unattended: plan, implement, review and record each, and stop when one needs you |
 | `sw-explain` | explain a task: what, why, dependencies, what it unblocks |
 | `sw-triage` | for a problem: seen before? lessons, likely causes |
+| `sw-board` | refresh the task list in `index.md` from the task files |
 | `sw-lint` | structural checks by script, semantic review on request |
 | `sw-visualize` | open the viewer |
 | `sw-stats` | what the current session has cost: tokens, context, steps and tool calls, per agent |
@@ -218,6 +220,9 @@ Shown as typed in Claude Code. In Codex, write `$sw-plan` instead of `/sw-plan`.
 
 /sw-implement P-15                run P-15; refuses if a dependency is not done
 /sw-implement                     continue what is in progress, or pick a ready task
+/sw-run the backend tasks, commit after each
+                                  one task after another without asking at each step;
+                                  stops when a task needs you, and reports what it decided
 
 /sw-explain M-06                  what M-06 is, why it exists, what it waits on and unblocks
 /sw-triage photo uploads hang at 100% on mobile since yesterday
@@ -226,6 +231,7 @@ Shown as typed in Claude Code. In Codex, write `$sw-plan` instead of `/sw-plan`.
                                   file a source and summarise it into the wiki
 
 /sw-config plan with opus, implement with sonnet, review with opus
+/sw-board                         refresh the task list in index.md after you edited tasks by hand
 /sw-lint                          check links, frontmatter and task dependencies
 /sw-visualize                     open the task board and the wiki in the browser
 /sw-stats                         what this session has cost so far, per agent

@@ -44,6 +44,7 @@ Skills. Use these without being asked. For work in this vault they come before a
 {{#tasks}}
 - Planning a task, or the user asks what to work on next: `sw-plan`.
 - Implementing a task: `sw-implement`. A change that needs no plan and touches one or two files may be done directly, under the task rules above.
+- Several tasks in a row without the user at each step: `sw-run`.
 - A question about a task (what, why, what it blocks): `sw-explain`.
 {{/tasks}}
 - A bug, failure or unexpected behavior is reported: `sw-triage` first, before any debugging.

@@ -37,9 +37,11 @@ No tool lets a skill change the model of the running session, so the skills hand
 
 When the user asks to set a model:
 
-1. Ask only for what is missing: role, tool, model. If they name a model without a tool, infer the tool from the model family and say which you chose. Use the model name exactly as that tool spells it; do not translate names between tools.
-2. Run the `model` command. Show its output.
-3. Say that a tool picks up new agent files when its next session starts.
+1. **See what is set**: `show`.
+2. **Settle role, tool and model.** Ask only for what is missing. If they name a model without a tool, infer the tool from the model family and say which you chose. Use the model name exactly as that tool spells it; do not translate names between tools.
+3. **Change only what differs.** If the role already runs that model, change nothing and say so. A tool's short name and the full name of its current version (`opus` and the newest Opus) are the same model: do not rewrite one into the other.
+4. **Run the `model` command** and show its output.
+5. **Say when it takes effect**: a tool picks up new agent files when its next session starts.
 
 After Superwiki itself is updated, run `sync` once: the roles' instructions are part of the agent files.
 

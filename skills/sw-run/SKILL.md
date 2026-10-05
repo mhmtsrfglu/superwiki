@@ -5,7 +5,7 @@ description: Use when the user wants several Superwiki tasks worked through one 
 
 # sw-run
 
-Works through tasks in order, unattended: for each one, plan it if it needs a plan, implement it, have it reviewed if it requires that, record it, and go on to the next. You are the orchestrator. Every piece of work goes to a subagent with a clean context; your session holds only the queue, the reports and the decisions.
+Works through tasks in order, unattended: for each one, plan it if it needs a plan, implement it, have it reviewed if it requires that, summarize it with evidence, record it, and go on to the next. You are the orchestrator. Every piece of work goes to a subagent with a clean context; your session holds only the queue, the reports and the decisions.
 
 Each task is run exactly as sw-implement runs it. This skill adds what a run of many needs: answers agreed once at the start, decisions you make in the user's place and write down, and rules for when to stop.
 
@@ -32,7 +32,7 @@ Run commands from the project root.
 ## Each task
 
 1. **Next task**: `node docs/.sw/sw.mjs ready`. A task in progress comes first, then the first ready task in scope. None left: go to "The report".
-2. **Run it as sw-implement does**: gate, mark it started, checks that need the environment, implementer, judge the report, review if required, record, task list. Load sw-implement once and follow it for every task. What differs in a run:
+2. **Run it as sw-implement does**: gate, mark it started, checks that need the environment, implementer, judge the report, review if required, summarize (sw-summarize, a command run for every "Done when" item), record, task list. Load sw-implement and sw-summarize once and follow it for every task. What differs in a run:
 
    | In sw-implement or sw-plan | In a run |
    | --- | --- |
@@ -51,6 +51,7 @@ Stop the run, leave the task `in-progress` with what is open in its "Notes", and
 
 - A requirement is `not met` or still `differs` after one more round with the implementer.
 - The review still says `changes needed` after two rounds.
+- The summary leaves an item unverified or failed.
 - The task cannot be verified without a `needs:` check that was not allowed.
 - A commit or push that was agreed is refused.
 - `lint` reports an error after the task was recorded.

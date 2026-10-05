@@ -1161,12 +1161,32 @@ function taskSections(t) {
       ${cell('Chain', `${up.size} ↑ · ${down.size} ↓`)}
     </div>
     ${callout}
+    ${t.summary ? `<div class="sec"><h4>Summary <span class="muted">${verdictCounts(t.summary)}</span></h4><div class="n-body n-summary"></div></div>` : ''}
     <div class="sec"><h4>Depends on <span class="muted">direct; open ▸ to follow the chain; dashed = soft</span></h4><div class="tree">${treeHtml(deps, 'deps')}</div></div>
     <div class="sec"><h4>Blocks <span class="muted">tasks waiting on this one</span></h4><div class="tree">${treeHtml(dependents, 'dependents')}</div></div>
-    <div class="sec"><h4>Details <span class="muted">${esc(t.page.path)}</span></h4><div class="n-body"></div></div>
+    <div class="sec"><h4>Details <span class="muted">${esc(t.page.path)}</span></h4><div class="n-body n-details"></div></div>
     ${linkedFrom(t.page)}`;
-  el.querySelector('.n-body').append(renderMd(t.page.body, t.page));
+  // The closing summary has its own section above, so "Details" shows the body without it.
+  if (t.summary) el.querySelector('.n-summary').append(badgeVerdicts(renderMd(t.summary.text, t.page)));
+  el.querySelector('.n-details').append(renderMd(t.summary ? t.summary.rest : t.page.body, t.page));
   return el;
+}
+
+// The closing summary's verdicts wear the status colours: verified as done, unverified as unknown, failed as blocked.
+const VERDICT_CLASS = { verified: 'st-done', unverified: 'st-unknown', failed: 'st-blocked' };
+
+function verdictCounts(s) {
+  return Object.keys(VERDICT_CLASS).filter(v => s[v]).map(v => `<span class="badge ${VERDICT_CLASS[v]}">${s[v]} ${v}</span>`).join(' ');
+}
+
+// In a rendered summary, the bold verdict that opens a numbered entry becomes a badge.
+function badgeVerdicts(root) {
+  for (const li of root.querySelectorAll('ol > li')) {
+    const strong = li.querySelector(':scope > strong:first-child, :scope > p:first-child > strong:first-child');
+    const cls = strong && VERDICT_CLASS[strong.textContent.trim()];
+    if (cls && !strong.previousSibling?.textContent.trim()) strong.classList.add('badge', cls);
+  }
+  return root;
 }
 
 function renderDrawer() {

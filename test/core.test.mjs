@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseFrontmatter, extractWikilinks, buildVault, lint, summary, tasksIn, nextId, taskOf, search, unblockedBy, guideFor } from '../src/core.js';
+import { parseFrontmatter, extractWikilinks, buildVault, lint, summary, tasksIn, nextId, taskOf, search, unblockedBy, guideFor, closingSummary } from '../src/core.js';
 
 const task = (id, fields = {}, body = '') => ({
   path: `tasks/${id}.md`,
@@ -96,6 +96,48 @@ test('lint: task rules', () => {
   has([{ path: 'tasks/notes.md', text: '---\ntype: task\nid: notes\ntitle: x\nstatus: todo\n---\n' }], 'bad-id');
   has([{ path: 'plans/T-05-plan.md', text: '---\ntype: plan\n---\n' }], 'orphan-plan');
   has([task('T-01'), { path: 'plans/T-01.md', text: '---\ntype: plan\n---\n' }], 'plan-name');
+});
+
+test('closing summary: verdicts per "Done when" item, and the done-unverified rule', () => {
+  const body = entries => `## Goal\nShip it.\n\n## Done when\n- First item.\n- Second item.\n\n## Summary\n\n### Verification\n${entries}\n`;
+  const dates = 'started: 2026-01-01\nfinished: 2026-01-02\n';
+  const summaryOf = (status, text) => {
+    const v = buildVault([index(), task('T-01', { status, extra: dates }, text)]);
+    return { summary: taskOf(v, 'T-01').summary, found: lint(v) };
+  };
+  const flagged = r => r.found.some(f => f.code === 'done-unverified');
+
+  const none = summaryOf('done', '## Done when\n- First item.\n');
+  assert.equal(none.summary, null);
+  assert.deepEqual(none.found, [], 'a done task without a summary is not a finding');
+
+  const complete = summaryOf('done', body('1. **verified**: First item.\n   - command: `npm test`\n2. **verified**: Second item.'));
+  assert.deepEqual({ ...complete.summary, text: undefined, rest: undefined }, { items: 2, verified: 2, unverified: 0, failed: 0, complete: true, text: undefined, rest: undefined });
+  assert.deepEqual(complete.found, [], 'complete summary, lint clean');
+
+  const partial = summaryOf('done', body('1. **verified**: First item.'));
+  assert.equal(partial.summary.verified, 1);
+  assert.equal(partial.summary.unverified, 1);
+  assert.equal(partial.summary.complete, false);
+  assert.ok(flagged(partial));
+  assert.match(partial.found.find(f => f.code === 'done-unverified').message, /^done but summary has 1 unverified, 0 failed$/);
+
+  const failed = summaryOf('done', body('1. **verified**: First item.\n2. **failed**: Second item.'));
+  assert.equal(failed.summary.failed, 1);
+  assert.equal(failed.summary.complete, false);
+  assert.ok(flagged(failed));
+
+  assert.equal(flagged(summaryOf('in-progress', body('1. **verified**: First item.'))), false, 'only a done task is held to its summary');
+  assert.equal(summaryOf('in-progress', body('')).summary.complete, false, 'a summary without entries is not complete');
+});
+
+test('closing summary: section text and the body without it', () => {
+  const s = closingSummary('## Goal\nShip it.\n\n## Summary\n\nSummarized today.\n\n### Verification\n1. **verified**: It works.\n\n## Notes\nKept.\n');
+  assert.equal(s.text, 'Summarized today.\n\n### Verification\n1. **verified**: It works.');
+  assert.equal(s.rest, '## Goal\nShip it.\n\n## Notes\nKept.');
+  assert.doesNotMatch(s.rest, /## Summary|Summarized/);
+  assert.deepEqual([s.items, s.verified, s.complete], [0, 1, true], 'without "Done when" bullets the entries count as written');
+  assert.equal(closingSummary('## Goal\n```\n## Summary\n```\n'), null, 'a heading inside a code fence is not the section');
 });
 
 test('lint: a cycle is reported once and does not hang wave calculation', () => {

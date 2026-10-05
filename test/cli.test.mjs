@@ -40,7 +40,7 @@ test('next-id', () => {
 
 test('check: start and finish gates, draft plan, required review', () => {
   const root = vault();
-  assert.match(sw(root, 'check', 'T-01').stdout, /^T-01 {2}todo {2}Task T-01\ncan start: yes\ncan finish: yes\nplan: none\nreview: not required\n$/);
+  assert.match(sw(root, 'check', 'T-01').stdout, /^T-01 {2}todo {2}Task T-01\ncan start: yes\ncan finish: no\nsummary: none\nplan: none\nreview: not required\n$/);
   assert.match(sw(root, 'check', 'T-02').stdout, /can start: no {2}open deps: T-01/);
   assert.equal(JSON.parse(sw(root, 'check', 'T-01', '--json').stdout).canStart, true);
 
@@ -52,6 +52,24 @@ test('check: start and finish gates, draft plan, required review', () => {
   assert.match(started, /can start: n\/a, status is in-progress {2}open deps: T-01/);
   assert.match(started, /review: required \(security\)/);
   assert.equal(sw(root, 'check', 'T-99').status, 2);
+});
+
+test('check: finishing needs a summary with every "Done when" item verified', () => {
+  const root = vault();
+  const frontmatter = '---\ntype: task\nid: T-01\ntitle: Task T-01\nstatus: in-progress\ndeps: []\n---\n';
+  const write = body => writeFileSync(join(root, 'docs/tasks/T-01.md'), frontmatter + body);
+
+  write('## Done when\n- It works.\n\n## Summary\n\n### Verification\n1. **verified**: It works.\n   - command: `npm test`\n');
+  assert.match(sw(root, 'check', 'T-01').stdout, /\ncan finish: yes\nsummary: 1 verified\n/);
+  assert.deepEqual(JSON.parse(sw(root, 'check', 'T-01', '--json').stdout).summary, { items: 1, verified: 1, unverified: 0, failed: 0, complete: true });
+
+  write('## Done when\n- It works.\n- It is documented.\n\n## Summary\n\n### Verification\n1. **verified**: It works.\n2. **unverified**: It is documented.\n');
+  assert.match(sw(root, 'check', 'T-01').stdout, /\ncan finish: no\nsummary: 1 verified, 1 unverified\n/);
+  const json = JSON.parse(sw(root, 'check', 'T-01', '--json').stdout);
+  assert.equal(json.canFinish, false);
+  assert.equal(json.summary.complete, false);
+
+  assert.equal(JSON.parse(sw(root, 'check', 'T-02', '--json').stdout).summary, null);
 });
 
 test('explain: dependencies, what it unblocks, area guide', () => {

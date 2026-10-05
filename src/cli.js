@@ -123,7 +123,10 @@ function check(ctx) {
   if (t.error) return { error: t.error };
   const openSoftDeps = t.openSoftDeps.filter(id => taskOf(ctx.vault, id));
   const canStart = t.status === 'todo' && !t.openDeps.length;
-  const canFinish = !t.openDeps.length && !t.openSoftDeps.length;
+  // Finishing needs a closing summary in which every "Done when" item is verified (sw-summarize).
+  const canFinish = !t.openDeps.length && !t.openSoftDeps.length && !!t.summary?.complete;
+  const closing = t.summary && { items: t.summary.items, verified: t.summary.verified, unverified: t.summary.unverified, failed: t.summary.failed, complete: t.summary.complete };
+  const verdicts = closing && ['verified', 'unverified', 'failed'].filter(verdict => closing[verdict]).map(verdict => `${closing[verdict]} ${verdict}`).join(', ');
   const plan = t.plan ? `docs/${t.plan.path}` : null;
   const openDeps = t.openDeps.length ? `  open deps: ${t.openDeps.join(', ')}` : '';
   const startLine = t.status === 'todo'
@@ -131,11 +134,12 @@ function check(ctx) {
     : `can start: n/a, status is ${t.status}${openDeps}`;
   const draft = t.plan?.data.status === 'draft' ? '  (draft, not approved)' : '';
   return {
-    data: { id: t.id, status: t.status, canStart, canFinish, openDeps: t.openDeps, openSoftDeps, plan, review: t.review || null },
+    data: { id: t.id, status: t.status, canStart, canFinish, openDeps: t.openDeps, openSoftDeps, plan, review: t.review || null, summary: closing },
     text: [
       `${t.id}  ${t.status}  ${t.title}`,
       startLine,
       `can finish: ${canFinish ? 'yes' : 'no'}${openSoftDeps.length ? `  open soft deps: ${openSoftDeps.join(', ')}` : ''}`,
+      `summary: ${closing ? verdicts || 'no entries' : 'none'}`,
       `plan: ${plan ? plan + draft : 'none'}`,
       `review: ${t.review ? `required (${t.review})` : 'not required'}`,
     ].join('\n'),

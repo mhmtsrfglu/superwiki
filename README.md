@@ -194,7 +194,8 @@ A project's `docs/` folder is plain markdown and keeps working as an Obsidian va
 | `sw-migrate` | convert an existing table-based task index, on a git branch of its own |
 | `sw-ingest` | file a source into the wiki |
 | `sw-plan` | plan a task with the planner subagent and get your approval |
-| `sw-implement` | run a task with the implementer subagent, have it reviewed if the task asks for that, and record the result |
+| `sw-implement` | run a task with the implementer subagent, have it reviewed if the task asks for that, summarize it with evidence, and record the result |
+| `sw-summarize` | close a task with a `## Summary` in its file: plan, implementation, changed files from git, and a freshly run command for each "Done when" item. A task is `done` only when every item is verified |
 | `sw-run` | work through several tasks in a row, unattended: plan, implement, review and record each, and stop when one needs you |
 | `sw-explain` | explain a task: what, why, dependencies, what it unblocks |
 | `sw-triage` | for a problem: seen before? lessons, likely causes |
@@ -220,6 +221,8 @@ Shown as typed in Claude Code. In Codex, write `$sw-plan` instead of `/sw-plan`.
 
 /sw-implement P-15                run P-15; refuses if a dependency is not done
 /sw-implement                     continue what is in progress, or pick a ready task
+/sw-summarize P-15                verify each "Done when" item of P-15 with a command and write
+                                  the summary into its task file (sw-implement does this itself)
 /sw-run the backend tasks, commit after each
                                   one task after another without asking at each step;
                                   stops when a task needs you, and reports what it decided
@@ -290,12 +293,12 @@ The skills call a small script that answers questions without the agent reading 
 ```bash
 node docs/.sw/sw.mjs status                 # counts per area
 node docs/.sw/sw.mjs ready                  # tasks that can start now
-node docs/.sw/sw.mjs check P-15             # can it start or finish, what is open, is a review required
+node docs/.sw/sw.mjs check P-15             # can it start or finish, what is open, its summary's verdicts, is a review required
 node docs/.sw/sw.mjs explain P-15           # dependencies, what it unblocks, plan, area guide
 node docs/.sw/sw.mjs search sync timeout    # where something is mentioned
 node docs/.sw/sw.mjs next-id P              # next free id in an area
 node docs/.sw/sw.mjs board                  # rewrite the task list in index.md from the task files
-node docs/.sw/sw.mjs lint                   # broken links, bad frontmatter, dependency errors, a stale task list
+node docs/.sw/sw.mjs lint                   # broken links, bad frontmatter, dependency errors, a done task with an unverified summary, a stale task list
 node docs/.sw/sw.mjs stats                  # tokens, context and steps of the agent session here
 node docs/.sw/sw.mjs doctor                 # what that session carried before it read anything
 node docs/.sw/sw.mjs serve --open           # the viewer, reading files live

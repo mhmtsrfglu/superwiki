@@ -21,7 +21,7 @@ Wiki:
 
 Tasks:
 
-- A task's status lives only in its frontmatter. Before you start: `status: in-progress` and `started:`. When its "Done when" list is met: `status: done` and `finished:`. Each change of status gets a `task` entry in `log.md`.
+- A task's status lives only in its frontmatter. Before you start: `status: in-progress` and `started:`. When its "Done when" list is met and `sw-summarize` has verified it: `status: done` and `finished:`. Each change of status gets a `task` entry in `log.md`, each summary a `summary` entry.
 - The task list in `index.md` is written from the task files. After you add a task or change a task's status, title, milestone or dependencies, run `node docs/.sw/sw.mjs board`. Never edit that list by hand.
 - Do not start a task while any of its `deps` is not done.
 - If `explain <ID>` names an area guide (`docs/wiki/guide-<area>.md`), read it before you change code for the task: where things are, patterns, how to verify. Afterwards add the facts it was missing, one line each.
@@ -32,6 +32,7 @@ Skills. Use these without being asked. For work in this vault they come before a
 
 - Planning a task, or the user asks what to work on next: `sw-plan`.
 - Implementing a task: `sw-implement`. A change that needs no plan and touches one or two files may be done directly, under the task rules above.
+- Closing a task, or the user asks what a task did and how it was verified: `sw-summarize`.
 - Several tasks in a row without the user at each step: `sw-run`.
 - A question about a task (what, why, what it blocks): `sw-explain`.
 - A bug, failure or unexpected behavior is reported: `sw-triage` first, before any debugging.

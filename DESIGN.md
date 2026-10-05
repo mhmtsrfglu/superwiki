@@ -31,6 +31,7 @@ docs/            the vault
 - Task frontmatter: required `id`, `title`, `status`, `deps`; optional `soft_deps`, `milestone`, `priority`, `review`, `started`, `finished`. Any value in `review` asks for a separate review before the task can be done.
 - Statuses: `todo`, `in-progress`, `done`, `cancelled`. Cancelled tasks stay on disk; ids are never reused.
 - `deps` must be done before a task starts. `soft_deps` allow starting but block finishing.
+- A closed task ends with a `## Summary` section, written by `sw-summarize`: `### Plan`, `### Implementation`, `### Changes` (files taken from git) and `### Verification`, a numbered list with one entry per "Done when" item that starts with a bold verdict, `verified`, `unverified` or `failed`, followed by the command and its result. An item without an entry counts as unverified. `check` says `can finish: yes` only when every item is verified; `lint` reports `done-unverified` for a `done` task whose summary holds an unverified or failed item. A `done` task with no summary predates the rule and is not a finding.
 - Execution order is derived from dependencies plus optional `priority`. There is no stored sequence number or dependency table. The one summary, the task list in `index.md`, is generated and never edited.
 - A single-project repository uses one area (default `T`); the viewer hides area cards and the area filter then.
 - Everything Superwiki ships is in English. Content an agent writes into a vault follows that vault's language.
@@ -106,6 +107,7 @@ What follows from it in the design:
 
 - **The main session stays out of the work.** It reads the task file and the reports; the code, the plan and the review are read in subagents that start clean and end with the task.
 - **A review is a separate, clean context.** A task whose frontmatter has `review:` is reviewed by a reviewer subagent after the implementer's report passes: it lists what the change claims, tries to break each claim, and classifies what it finds. It sees the change, not the reasoning that produced it, and its instructions forbid editing the repository. Blocking findings go back to the implementer, twice at most, then to the user.
+- **Done means verified.** A report that says `met` is a claim, and the session that receives it is inclined to believe it. Before `sw-implement` sets `done` it follows `sw-summarize`: one command per "Done when" item, run then, and the verdicts written into the task file where `check` reads them. The summary runs in the dispatching session, not in a fourth subagent and not in the implementer: the commands are few and their output is short, so the main session can afford them, and the agent that did the work is the one whose word is being checked.
 - **One task, one session.** `sw-implement` ends by saying so. The task is recorded in files, so nothing is lost by starting fresh, and the next task does not pay for this one's history.
 
 What the measured task also shows is where the cost now sits. The implementer sent more than half of the tokens, and its context grew fourfold, partly because the fix rounds continued the same agent, which keeps what it has read. Sending a fix to a fresh implementer would start small but read the code again; which is cheaper has not been measured. And every agent started at 59k to 79k before it had read anything.
@@ -178,7 +180,8 @@ These formats are not documented by their vendors and can change with a release.
 | `sw-migrate` | convert a table-based task index, on a git branch of its own |
 | `sw-ingest` | turn a raw source into wiki pages |
 | `sw-plan` | decide whether a plan is needed; have the planner subagent write it; get approval |
-| `sw-implement` | run a task with the implementer subagent, check every requirement, have it reviewed where the task asks for that, record the result |
+| `sw-implement` | run a task with the implementer subagent, check every requirement, have it reviewed where the task asks for that, summarize it, record the result |
+| `sw-summarize` | the gate before `done`: write the task's `## Summary`, with changed files from git and a freshly run command for each "Done when" item |
 | `sw-run` | work through several tasks unattended, with answers agreed up front, decisions recorded and rules for stopping |
 | `sw-explain` | explain one task: what, why, dependencies, what it unblocks |
 | `sw-triage` | for a reported problem: earlier occurrences, lessons, likely causes; fixes nothing |
@@ -206,6 +209,8 @@ No tool lets a skill change the running session's model, and only Claude Code le
 `sw-init` copies the CLI and the viewer into the project, so skills call `node docs/.sw/sw.mjs` the same way in every agent, and a project keeps working with the version it was set up with. The price: after Superwiki is updated, a project has the old script until `sw-init` runs there again. A skill that needs a command the script lacks says so and offers to run it.
 
 `sw-visualize` runs `sw.mjs serve --open`: a small server on 127.0.0.1, started once per project, reused, and gone after two idle hours. It serves the viewer and the vault's pages, read from disk on every Refresh, so the user picks nothing and any browser works. Without the server, `sw.mjs snapshot` writes the pages to `docs/.sw/data.js` and the viewer opens as a file, frozen at that moment. `data.js` and the server's address file are git-ignored.
+
+The core also parses a task's `## Summary` (`closingSummary`), so `check`, `lint` and the viewer agree on its verdicts. The viewer's task drawer shows the summary in a section of its own, with the verdicts as badges and their counts in the heading, and leaves it out of "Details"; a task without a summary gets no such section.
 
 ## Migration
 
@@ -244,6 +249,7 @@ A mapping can keep any column as a frontmatter field (a review class becomes `re
 - Codex and Copilot CLI: `sw-implement`, the review and the current `sw-plan` have not been run there.
 - Copilot CLI: whether the `model:` field of a generated agent file is honoured.
 - Session records: a Copilot session that was resumed closes more than once, and `stats` adds the closing records up; whether each one covers only its own run has not been checked. Codex and Copilot sessions longer than a few steps have not been read.
-- `sw-visualize`, `sw-doctor`, `sw-run` and `sw-board` skill texts have not been followed by an agent.
+- `sw-visualize`, `sw-doctor`, `sw-run`, `sw-board` and `sw-summarize` skill texts have not been followed by an agent.
+- The summary in the viewer's task drawer has not been looked at in a browser; its parsing is unit-tested.
 - Plugin manifests (`.claude-plugin`, `.codex-plugin`) validate but have not been installed.
 - Migration leaves links in files outside `docs/` (for example `architecture.md`) pointing at archived files.

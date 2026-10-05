@@ -79,6 +79,54 @@ export function extractWikilinks(body) {
   return out;
 }
 
+// ---------- Closing summary ----------
+// The `## Summary` section sw-summarize writes into a task file when the task is closed. Its
+// "Verification" list holds one numbered entry per "Done when" item: `1. **verified**: ...`.
+const VERDICT_ENTRY = /^(\d+)\.\s+\*\*(verified|failed|unverified)\*\*/;
+
+// Line ranges [start, end) of a body's `## ` sections, by heading text. Fenced code is skipped.
+function levelTwoSections(lines) {
+  const out = [];
+  let fenced = false;
+  lines.forEach((line, i) => {
+    if (/^\s*(```|~~~)/.test(line)) { fenced = !fenced; return; }
+    if (fenced) return;
+    const m = /^## +(.*?)\s*$/.exec(line);
+    if (!m) return;
+    if (out.length) out[out.length - 1].end = i;
+    out.push({ title: m[1].toLowerCase(), start: i, end: lines.length });
+  });
+  return out;
+}
+
+// null when the body has no `## Summary`. Otherwise the verdict counts over the "Done when" items
+// (an item without an entry is unverified), `complete` when every item is verified, the section's
+// markdown without its heading (`text`) and the body without the section (`rest`).
+export function closingSummary(body) {
+  const lines = String(body ?? '').split(/\r?\n/);
+  const sections = levelTwoSections(lines);
+  const section = sections.find(s => s.title === 'summary');
+  if (!section) return null;
+  const doneWhen = sections.find(s => s.title === 'done when');
+  const items = doneWhen ? lines.slice(doneWhen.start + 1, doneWhen.end).filter(l => /^[-*+]\s+\S/.test(l)).length : 0;
+  const inside = lines.slice(section.start + 1, section.end);
+  const entries = new Map();
+  for (const line of inside) {
+    const m = VERDICT_ENTRY.exec(line);
+    if (m && !entries.has(Number(m[1]))) entries.set(Number(m[1]), m[2]);
+  }
+  const counts = { verified: 0, unverified: 0, failed: 0 };
+  if (items) for (let n = 1; n <= items; n++) counts[entries.get(n) ?? 'unverified']++;
+  else for (const verdict of entries.values()) counts[verdict]++;
+  return {
+    items,
+    ...counts,
+    complete: entries.size > 0 && counts.unverified === 0 && counts.failed === 0,
+    text: inside.join('\n').trim(),
+    rest: [...lines.slice(0, section.start), ...lines.slice(section.end)].join('\n').trim(),
+  };
+}
+
 // ---------- Vault ----------
 const key = name => String(name).toLowerCase();
 const areaOf = id => (String(id).includes('-') ? String(id).slice(0, String(id).lastIndexOf('-')) : '');
@@ -123,6 +171,8 @@ export function buildVault(files) {
       started: d.started || '', finished: d.finished || '',
       // Any value asks for a separate review before the task may be done; the value names the kind.
       review: d.review ? String(d.review) : '',
+      // The closing summary's verdicts, or null while the task file has no `## Summary`.
+      summary: closingSummary(p.body),
       state: null, wave: 0, dependents: [], plan: null,
     });
   }
@@ -237,6 +287,8 @@ export function lint(vault) {
     const softOpen = t.openSoftDeps.filter(id => taskOf(vault, id));
     if (t.status === 'in-progress' && hardOpen.length) add('error', 'started-before-deps', path, `in-progress but not done: ${hardOpen.join(', ')}`);
     if (t.status === 'done' && (hardOpen.length || softOpen.length)) add('error', 'done-before-deps', path, `done but not done: ${[...hardOpen, ...softOpen].join(', ')}`);
+    // A done task without a summary predates the gate and is fine; a summary that is there must hold.
+    if (t.status === 'done' && t.summary && !t.summary.complete) add('error', 'done-unverified', path, `done but summary has ${t.summary.unverified} unverified, ${t.summary.failed} failed`);
     if ((t.status === 'in-progress' || t.status === 'done') && !t.started) add('warn', 'missing-date', path, '`started` is empty');
     if (t.status === 'done' && !t.finished) add('warn', 'missing-date', path, '`finished` is empty');
   }
@@ -1084,7 +1136,10 @@ function check(ctx) {
   if (t.error) return { error: t.error };
   const openSoftDeps = t.openSoftDeps.filter(id => taskOf(ctx.vault, id));
   const canStart = t.status === 'todo' && !t.openDeps.length;
-  const canFinish = !t.openDeps.length && !t.openSoftDeps.length;
+  // Finishing needs a closing summary in which every "Done when" item is verified (sw-summarize).
+  const canFinish = !t.openDeps.length && !t.openSoftDeps.length && !!t.summary?.complete;
+  const closing = t.summary && { items: t.summary.items, verified: t.summary.verified, unverified: t.summary.unverified, failed: t.summary.failed, complete: t.summary.complete };
+  const verdicts = closing && ['verified', 'unverified', 'failed'].filter(verdict => closing[verdict]).map(verdict => `${closing[verdict]} ${verdict}`).join(', ');
   const plan = t.plan ? `docs/${t.plan.path}` : null;
   const openDeps = t.openDeps.length ? `  open deps: ${t.openDeps.join(', ')}` : '';
   const startLine = t.status === 'todo'
@@ -1092,11 +1147,12 @@ function check(ctx) {
     : `can start: n/a, status is ${t.status}${openDeps}`;
   const draft = t.plan?.data.status === 'draft' ? '  (draft, not approved)' : '';
   return {
-    data: { id: t.id, status: t.status, canStart, canFinish, openDeps: t.openDeps, openSoftDeps, plan, review: t.review || null },
+    data: { id: t.id, status: t.status, canStart, canFinish, openDeps: t.openDeps, openSoftDeps, plan, review: t.review || null, summary: closing },
     text: [
       `${t.id}  ${t.status}  ${t.title}`,
       startLine,
       `can finish: ${canFinish ? 'yes' : 'no'}${openSoftDeps.length ? `  open soft deps: ${openSoftDeps.join(', ')}` : ''}`,
+      `summary: ${closing ? verdicts || 'no entries' : 'none'}`,
       `plan: ${plan ? plan + draft : 'none'}`,
       `review: ${t.review ? `required (${t.review})` : 'not required'}`,
     ].join('\n'),

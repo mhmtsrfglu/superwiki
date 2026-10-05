@@ -28,6 +28,7 @@ Two passes. The first is a script and costs almost nothing. The second reads pag
    | Finding | Why it needs a human |
    |---|---|
    | `started-before-deps`, `done-before-deps`, `dep-cycle`, `cancelled-dep` | either the status or the dependency is wrong; only the user knows which |
+   | `done-unverified` | the task is `done` but its `## Summary` holds an unverified or failed item. Run sw-summarize for it; do not edit a verdict by hand |
    | `missing-date` you could not fill | no history to take it from, or it hangs on a finding above |
    | `duplicate-name` | one of the pages must be renamed and every link to it re-pointed |
    | `broken-link` with no clear target, `orphan-plan`, `unknown-dep` | the page may be missing or the reference stale |

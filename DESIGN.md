@@ -95,7 +95,7 @@ This is not the same task run both ways, so it shows direction and not a ratio.
 
 ### What every agent starts with
 
-A session's start is sent again with every step of every agent, so in the run above it was roughly eight of the twenty-one million tokens sent. Almost none of it was Superwiki's: the vault adds a 1.7 KB block of rules. The tool's own count for the main session, in tokens:
+A session's start is sent again with every step of every agent, so in the run above it was roughly eight of the twenty-one million tokens sent. Almost none of it was Superwiki's: the vault adds a 2.7 KB block of rules (1.7 KB without the task module). The tool's own count for the main session, in tokens:
 
 | Part | Tokens | What it was |
 | --- | --- | --- |

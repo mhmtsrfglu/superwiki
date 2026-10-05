@@ -29,7 +29,7 @@ Measured on a real project with 165 tasks, converted from a single markdown inde
 
 | | Before | After |
 | --- | --- | --- |
-| Read at the start of every session | 197 KB index | 94-byte catalog + 1.7 KB of rules |
+| Read at the start of every session | 197 KB index | 94-byte catalog + 2.7 KB of rules |
 | Read to start one task | the index, then the task's section | one file, 2 KB at the median |
 | Marking a task done | a status cell, plus a ✅ at every reference to it (median 12 places) | one frontmatter line |
 

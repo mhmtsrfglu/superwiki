@@ -1,6 +1,6 @@
 {
   "name": "superwiki",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "Agent skills that turn docs/ into an LLM-maintained wiki and task tracker. Obsidian-friendly. Works with Claude Code, Codex and Copilot CLI.",
   "keywords": [
     "claude-code",

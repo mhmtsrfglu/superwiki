@@ -1,7 +1,7 @@
 {
   "name": "sw",
   "description": "An LLM-maintained wiki and task tracker in docs/ for coding agents. Obsidian friendly, with a static viewer.",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "license": "MIT",
   "keywords": [
     "wiki",

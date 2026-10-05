@@ -30,7 +30,7 @@ Run commands from the project root.
    | the commands the implementer reported | no plan, and a report is in this session |
    | you choose it | otherwise, or the listed command does not prove the item |
 
-   A requirement about text (a document mentions something, a file exists, a format is described) is proven by `grep`, `test -f` or `lint`, not by having written the text. A check needs the environment when it starts a service, needs a running stack or changes data. It runs only if the user allowed it: under sw-implement the answer is on that skill's list of such checks; when you summarize outside it, ask the user before you run one.
+   A requirement about text (a document mentions something, a file exists, a format is described) is proven by `grep`, `test -f` or `lint`, not by having written the text. A requirement about behaviour (what a program, an endpoint or an agent following a prompt does) is proven by running the thing and observing it: run the program, call the endpoint, or dispatch a fresh agent on the scenario and read what it does. Finding the code or text that should cause the behaviour proves only that the text is there; without a run the item is `unverified`. A check needs the environment when it starts a service, needs a running stack or changes data. It runs only if the user allowed it: under sw-implement the answer is on that skill's list of such checks; when you summarize outside it, ask the user before you run one.
 4. **Run every command now and read the result.** Exit code first, then the line that shows the item holds: the test count, the matching line, the `0 errors`.
 
    | What you have | Verdict |
@@ -94,6 +94,7 @@ Source: `git status --porcelain` at <short HEAD>.
 - Writing `verified` from the implementer's report. The report says where to look; the command you run says whether it is true.
 - One `npm test` as the evidence for every item. Each item gets the command that shows that item; a suite proves only what its tests cover.
 - "The file was written, so the item is met." Run the `grep` or `test -f`.
+- Closing a behavioural item with `grep`. The line exists; whether anything follows it is what the item asks.
 - Listing changed files from what you remember of the session. Git knows; ask it.
 - Softening a `failed` or `unverified` into `verified` with a note. A note does not open the gate; the verdict does.
 - Running a check that needs the environment and was not allowed, because the summary would otherwise stay incomplete. It stays incomplete, and the task stays open.

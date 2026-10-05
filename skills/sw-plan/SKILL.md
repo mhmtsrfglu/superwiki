@@ -14,7 +14,10 @@ Needs the task module (`docs/tasks/`). If it is missing, say so and offer sw-ini
 1. **Pick the task.**
    - Id given: `node docs/.sw/sw.mjs check <ID>`, then read `docs/tasks/<ID>.md`. Status `done` or `cancelled`: stop and ask what the user wants. A plan already exists: this run revises it; say so. Open deps do not prevent planning.
    - No id, existing work: `node docs/.sw/sw.mjs ready`, and let the user choose.
-   - New work: agree on title, area and dependencies with the user, get the id from `node docs/.sw/sw.mjs next-id <AREA>`, and write `docs/tasks/<ID>.md` from `docs/.sw/templates/task.md` with `status: todo`, a "Goal" and a "Done when" list. Append `## [date] task | <ID> created` to `docs/log.md`.
+   - New work: agree on title, area and dependencies with the user, and get the id from `node docs/.sw/sw.mjs next-id <AREA>`. Then:
+     - write `docs/tasks/<ID>.md` from `docs/.sw/templates/task.md` with `status: todo`, a "Goal" and a "Done when" list;
+     - append `## [date] task | <ID> created` to `docs/log.md`;
+     - run `node docs/.sw/sw.mjs board`, so the task list in `index.md` shows it.
 2. **Does it need a plan?** Judge from the task file alone. A task is small when all of these hold: one area, three "Done when" items or fewer, nothing left open in its notes, and the change it describes is confined to a few files. A small task needs no plan: say so and offer `sw-implement <ID>` directly. Go on with planning only if the user wants a plan anyway, or the task is not small.
 3. **Clarify.** Ask the user only what the task file leaves open about scope or intent, one question at a time, each with your recommendation. Add the answers to the task's "Notes" now. Do not read code to find questions; the planner surfaces the technical ones. Skip this when nothing is open.
 4. **Dispatch the planner.** Its prompt is: the task id, today's date, the project root if it is not your working directory, and any feedback from an earlier round. It writes the plan file as a draft and returns a short message.
@@ -36,7 +39,7 @@ Needs the task module (`docs/tasks/`). If it is missing, say so and offer sw-ini
    - in the area guide, if `node docs/.sw/sw.mjs explain <ID>` names one, the planner's `Guide:` lines, one line per fact;
    - in `docs/log.md`, a new entry `## [date] plan | <ID>`, in the layout the log's last entries use.
 
-   Then run `node docs/.sw/sw.mjs lint`.
+   Then run `node docs/.sw/sw.mjs lint`. If it reports `stale-board`, a task's title, milestone or dependencies changed along the way: run `node docs/.sw/sw.mjs board`.
 7. **Stop.** Do not start implementing. Tell the user the plan is approved and that sw-implement `<ID>` runs it.
 
 ## Common mistakes
@@ -46,3 +49,4 @@ Needs the task module (`docs/tasks/`). If it is missing, say so and offer sw-ini
 - Editing the plan yourself. If something in it is wrong, send it back to the planner.
 - Setting the task to `in-progress`. Planning does not change status.
 - Planning several tasks in one plan file. One task, one plan; shared design goes to a `type: decision` wiki page that the plans link.
+- Adding the new task to the list in `index.md` by hand. `board` writes that list from the task files.

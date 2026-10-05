@@ -9,7 +9,7 @@ This file records the decisions and, at the end, what has and has not been prove
 ```text
 AGENTS.md        short always-on schema (CLAUDE.md imports it)
 docs/            the vault
-  index.md       catalog: one line per wiki page
+  index.md       the open tasks (generated), then the catalog: one line per wiki page
   log.md         append-only: ## [YYYY-MM-DD] kind | title
   raw/           immutable sources
   wiki/          flat; frontmatter `type` and `summary`
@@ -31,7 +31,7 @@ docs/            the vault
 - Task frontmatter: required `id`, `title`, `status`, `deps`; optional `soft_deps`, `milestone`, `priority`, `review`, `started`, `finished`. Any value in `review` asks for a separate review before the task can be done.
 - Statuses: `todo`, `in-progress`, `done`, `cancelled`. Cancelled tasks stay on disk; ids are never reused.
 - `deps` must be done before a task starts. `soft_deps` allow starting but block finishing.
-- Execution order is derived from dependencies plus optional `priority`. There is no stored sequence number, summary table or dependency table.
+- Execution order is derived from dependencies plus optional `priority`. There is no stored sequence number or dependency table. The one summary, the task list in `index.md`, is generated and never edited.
 - A single-project repository uses one area (default `T`); the viewer hides area cards and the area filter then.
 - Everything Superwiki ships is in English. Content an agent writes into a vault follows that vault's language.
 
@@ -39,11 +39,23 @@ docs/            the vault
 
 The design is driven by what an agent must read and write per task.
 
-1. The only mandatory read is `index.md`: one line per page.
+1. The only mandatory read is `index.md`: the open tasks and one line per wiki page.
 2. `log.md` is appended to and read with `tail`, never whole.
-3. A fact has one home. A task's status is in its frontmatter only; counts, waves and blockers are computed.
+3. A fact has one home. A task's status is in its frontmatter only; counts, waves and blockers are computed, and the task list in `index.md` is written from them.
 4. Ingest touches few files: a source summary, `index.md`, `log.md`. Wider cross-updates are recorded as follow-ups and done in lint passes.
 5. Mechanical questions are answered by `docs/.sw/sw.mjs`, not by reading files.
+
+### The task list in the index
+
+The first design had no task list anywhere in markdown: the viewer showed the tasks, and `index.md` held only the wiki catalog. That left a person who reads the vault as files, in an editor or in Obsidian, with an empty index and no way to follow the work without opening the viewer.
+
+`index.md` therefore opens with a generated section (`src/board.js`, `sw.mjs board`): the counts, then the tasks in progress, ready and blocked, a line each with a link, the milestone and what a blocked task waits on; finished tasks by id only. Three decisions:
+
+- **It is a view.** Status still has one home. The agent runs `board` after it changes a task; `lint` warns (`stale-board`, `missing-board`) when the section does not match the task files, so a hand edit of a status in Obsidian is caught the next time anything is checked. Nothing rewrites the file as a side effect of a read.
+- **It lives in the index, not in a file of its own.** That is where a person looks, and the agent, which reads the index first anyway, sees what is ready without a command.
+- **It costs what the open work costs.** Finished tasks take nine characters each, so the section shrinks as a project is worked off. Open tasks do not: 2 KB on a project with 28 open tasks, 7.7 KB on one with 97, read once by every agent. A backlog of hundreds of blocked tasks would make this the largest thing a session reads; listing blocked tasks by id only is the obvious next cut, not made yet.
+
+`sw-init` writes the section, also into an index that existed before it, above the text that was there.
 
 ## Cost of a task
 

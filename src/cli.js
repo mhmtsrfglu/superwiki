@@ -5,6 +5,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, writeFi
 import { createServer } from 'node:http';
 import { basename, dirname, join, resolve as resolvePath } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { boardFinding, indexWithBoard, taskBoard } from './board.js';
 import { VAULT_FOLDERS, buildVault, guideFor, lint, nextId, resolve, search, summary, taskOf, tasksIn, unblockedBy } from './core.js';
 import { formatStartContext, startContext } from './doctor.js';
 import { SESSION_TOOLS, findSession } from './sessions.js';
@@ -20,6 +21,7 @@ const HELP = `sw <command> [--docs <dir>] [--json]
   explain <ID>    a task's dependencies, what it blocks and unblocks, its plan and linked pages
   search <words>  pages and log entries that mention the words, best match first
   next-id <AREA>  next free task id for an area (numbers are never reused)
+  board           rewrite the task list in docs/index.md from the task files
   lint            structural checks; exit code 1 on errors
   stats           what the agent session here has cost so far: steps, context and tokens per agent
   doctor          what that session carried before it read anything: rule files, skill and tool lists
@@ -235,8 +237,25 @@ function nextIdCommand({ vault, args }) {
   return { data: { id }, text: id };
 }
 
+// The task list in index.md is a view of the task files; this writes it again from them.
+function boardCommand({ docs, vault }) {
+  if (!existsSync(join(docs, 'tasks'))) return { error: 'this vault has no task module (docs/tasks); sw-init --tasks adds it', code: 1 };
+  const path = join(docs, 'index.md');
+  if (!existsSync(path)) return { error: 'docs/index.md is missing; run sw-init', code: 1 };
+  const before = readFileSync(path, 'utf8');
+  const after = indexWithBoard(before, taskBoard(vault));
+  const changed = after !== before;
+  if (changed) writeFileSync(path, after);
+  const { total } = summary(vault);
+  return {
+    data: { changed, ready: total.ready, inProgress: total.progress, blocked: total.blocked, done: total.done },
+    text: `board: docs/index.md ${changed ? 'updated' : 'unchanged'}  ready ${total.ready}  in-progress ${total.progress}  blocked ${total.blocked}  done ${total.done}`,
+  };
+}
+
 function lintCommand({ vault }) {
-  const findings = lint(vault);
+  const board = boardFinding(vault);
+  const findings = [...lint(vault), ...(board ? [board] : [])];
   const errors = findings.filter(f => f.level === 'error').length;
   return {
     data: findings,
@@ -379,6 +398,7 @@ const COMMANDS = {
   explain: { run: explain, needsVault: true },
   search: { run: searchCommand, needsVault: true },
   'next-id': { run: nextIdCommand, needsVault: true },
+  board: { run: boardCommand, needsVault: true },
   lint: { run: lintCommand, needsVault: true },
   stats: { run: statsCommand, needsVault: false },
   doctor: { run: doctorCommand, needsVault: false },

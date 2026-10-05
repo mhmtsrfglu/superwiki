@@ -29,7 +29,7 @@ Measured on a real project with 165 tasks, converted from a single markdown inde
 
 | | Before | After |
 | --- | --- | --- |
-| Read at the start of every session | 197 KB index | 94-byte catalog + 2.7 KB of rules |
+| Read at the start of every session | 197 KB index | 7.7 KB index (the 97 open tasks, a line each) + 2.7 KB of rules |
 | Read to start one task | the index, then the task's section | one file, 2 KB at the median |
 | Marking a task done | a status cell, plus a ✅ at every reference to it (median 12 places) | one frontmatter line |
 
@@ -39,7 +39,7 @@ Measured on a real project with 165 tasks, converted from a single markdown inde
 
 ```text
 docs/
-  index.md       catalog of the wiki, one line per page
+  index.md       the open tasks, then the catalog of the wiki, one line per page
   log.md         append-only history
   raw/           your sources, never modified
   wiki/          pages the agent writes
@@ -49,6 +49,31 @@ docs/
 ```
 
 `AGENTS.md` gets a short block of rules so the agent maintains the vault in every session, with or without a command.
+
+You can follow the work without the viewer: `index.md` opens with the task list, written from the task files. Each open task is a line that links to its file; finished ones are listed by id.
+
+```markdown
+## Tasks
+
+ready 9 · in progress 1 · blocked 18 · done 20
+
+**In progress**
+
+- [[B-20]] Portfolio sync · M5
+
+**Ready**
+
+- [[F-01]] Frontend skeleton and guards · M0
+- [[B-18]] Valuation · M4
+
+**Blocked**
+
+- [[B-21]] Journal and thesis gates · M5 · waits on B-20
+
+**Done (20)** [[B-01]] [[B-02]] [[B-03]] ...
+```
+
+A task's status still lives only in its own file. The list is a view: the agent rewrites it with `sw.mjs board` whenever a task changes, and `lint` says when it has fallen behind.
 
 ## Install
 
@@ -263,7 +288,8 @@ node docs/.sw/sw.mjs check P-15             # can it start or finish, what is op
 node docs/.sw/sw.mjs explain P-15           # dependencies, what it unblocks, plan, area guide
 node docs/.sw/sw.mjs search sync timeout    # where something is mentioned
 node docs/.sw/sw.mjs next-id P              # next free id in an area
-node docs/.sw/sw.mjs lint                   # broken links, bad frontmatter, dependency errors
+node docs/.sw/sw.mjs board                  # rewrite the task list in index.md from the task files
+node docs/.sw/sw.mjs lint                   # broken links, bad frontmatter, dependency errors, a stale task list
 node docs/.sw/sw.mjs stats                  # tokens, context and steps of the agent session here
 node docs/.sw/sw.mjs doctor                 # what that session carried before it read anything
 node docs/.sw/sw.mjs serve --open           # the viewer, reading files live
@@ -281,6 +307,7 @@ Edit sources in `src/`:
 | File | What it is |
 | --- | --- |
 | `src/core.js` | the vault model, derived task state, lint and search; shared by the CLI and the viewer |
+| `src/board.js` | the task list in `index.md` |
 | `src/sessions.js` | finds the record an agent keeps of a session |
 | `src/stats.js` | reduces a session record to cost per agent |
 | `src/doctor.js` | reduces a session record to what the session started with |

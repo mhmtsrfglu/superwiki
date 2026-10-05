@@ -12,7 +12,7 @@ const read = p => readFileSync(join(root, p), 'utf8');
 mkdirSync(assets, { recursive: true });
 
 // In dependency order: a module comes after the modules it imports from.
-const CLI_MODULES = ['src/core.js', 'src/sessions.js', 'src/stats.js', 'src/doctor.js', 'src/cli.js'];
+const CLI_MODULES = ['src/core.js', 'src/board.js', 'src/sessions.js', 'src/stats.js', 'src/doctor.js', 'src/cli.js'];
 
 // Joins ES modules into one file. Imports between the modules are dropped, since their code is in
 // the bundle; imports from Node are merged, since a file can import a name only once.

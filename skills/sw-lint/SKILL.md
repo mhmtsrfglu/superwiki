@@ -17,6 +17,7 @@ Two passes. The first is a script and costs almost nothing. The second reads pag
 
    | Finding | Fix |
    |---|---|
+   | `stale-board`, `missing-board` | `node docs/.sw/sw.mjs board`: it rewrites the task list in `index.md` from the task files. Never edit that list by hand |
    | `not-in-index` | add `- [[page]]: summary` to `index.md`, using the page's `summary:` |
    | `missing-field` `summary` | copy it from the page's line in `index.md`; if there is none, read the page and write it |
    | `missing-field` `type` | read that page, write the field |

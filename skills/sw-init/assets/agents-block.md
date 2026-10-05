@@ -3,7 +3,12 @@
 
 `docs/` is a wiki you write and keep current, and an Obsidian vault the user reads.
 
+{{#tasks}}
+- `docs/index.md`: the open tasks, then the catalog, one line per wiki page. Read it first, then open only the pages you need.
+{{/tasks}}
+{{^tasks}}
 - `docs/index.md`: catalog, one line per wiki page. Read it first, then open only the pages you need.
+{{/tasks}}
 - `docs/log.md`: append-only. Add `## [YYYY-MM-DD] <kind> | <title>` at the end; read it with `tail`, never whole.
 - `docs/raw/`: sources. Read, never modify.
 - `docs/wiki/`: flat, one page per topic, frontmatter `type:` and one-line `summary:`.
@@ -27,6 +32,7 @@ Wiki:
 Tasks:
 
 - A task's status lives only in its frontmatter. Before you start: `status: in-progress` and `started:`. When its "Done when" list is met: `status: done` and `finished:`. Each change of status gets a `task` entry in `log.md`.
+- The task list in `index.md` is written from the task files. After you add a task or change a task's status, title, milestone or dependencies, run `node docs/.sw/sw.mjs board`. Never edit that list by hand.
 - Do not start a task while any of its `deps` is not done.
 - If `explain <ID>` names an area guide (`docs/wiki/guide-<area>.md`), read it before you change code for the task: where things are, patterns, how to verify. Afterwards add the facts it was missing, one line each.
 - Work that belongs to no task (a quick fix, a small request) needs no task file. Append one `change` entry to `log.md` instead: what changed and why, in a line.

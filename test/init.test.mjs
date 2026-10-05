@@ -11,7 +11,9 @@ const sw = (root, ...args) => spawnSync('node', [join(root, 'docs/.sw/sw.mjs'), 
 const fresh = () => mkdtempSync(join(tmpdir(), 'sw-init-'));
 const read = (root, path) => readFileSync(join(root, path), 'utf8');
 
-test('new vault with tasks: files, config, clean lint', () => {
+const EMPTY_BOARD = '<!-- sw:board:start (written by `sw.mjs board`; do not edit) -->\n## Tasks\n\nNo tasks yet.\n<!-- sw:board:end -->';
+
+test('new vault with tasks: files, config, an index with the task list, clean lint', () => {
   const root = fresh();
   run(root, '--tasks', '--areas', 'M=Mobile,B=Backend');
   const expected = [
@@ -27,6 +29,7 @@ test('new vault with tasks: files, config, clean lint', () => {
   assert.match(config.name, /^sw-init-/);
   assert.equal(read(root, 'docs/.sw/.gitignore'), 'data.js\nserver.json\n');
   assert.equal(read(root, 'CLAUDE.md'), '@AGENTS.md\n');
+  assert.equal(read(root, 'docs/index.md'), `# Index\n\n${EMPTY_BOARD}\n\n## Wiki\n\nCatalog of the wiki: one line per page, \`- [[file-name]]: summary\`, grouped by type.\n`);
 
   const lint = sw(root, 'lint');
   assert.equal(lint.status, 0, lint.stdout + lint.stderr);
@@ -38,8 +41,10 @@ test('schema block with tasks: wiki, task and skill rules, no template markers',
   run(root, '--tasks');
   const agents = read(root, 'AGENTS.md');
   assert.doesNotMatch(agents, /\{\{/);
+  assert.match(agents, /`docs\/index\.md`: the open tasks, then the catalog/);
   assert.match(agents, /docs\/tasks\/<ID>\.md/);
   assert.match(agents, /\n\nTasks:\n\n- A task's status/);
+  assert.match(agents, /run `node docs\/\.sw\/sw\.mjs board`\. Never edit that list by hand/);
   assert.match(agents, /Work that belongs to no task .* one `change` entry/);
   assert.match(agents, /Implementing a task: `sw-implement`/);
   assert.match(agents, /`sw-triage` first/);
@@ -50,23 +55,27 @@ test('wiki-only vault leaves the task module out', () => {
   run(root, '--no-tasks');
   assert.ok(!existsSync(join(root, 'docs/tasks')));
   assert.ok(!existsSync(join(root, 'docs/.sw/templates/task.md')));
+  assert.doesNotMatch(read(root, 'docs/index.md'), /sw:board|## Tasks/);
   const agents = read(root, 'AGENTS.md');
-  assert.doesNotMatch(agents, /tasks\/<ID>|Tasks:|sw-plan|sw-implement|sw-explain/);
+  assert.doesNotMatch(agents, /tasks\/<ID>|Tasks:|sw-plan|sw-implement|sw-explain|board/);
+  assert.match(agents, /`docs\/index\.md`: catalog, one line per wiki page/);
   assert.match(agents, /sw\.mjs search/);
   assert.match(agents, /`sw-ingest`/);
   assert.match(agents, /When you change the project, append one `change` entry/);
 });
 
-test('re-run keeps user content and choices, and replaces only the managed block', () => {
+test('re-run keeps user content and choices, and replaces only what the tool owns', () => {
   const root = fresh();
   writeFileSync(join(root, 'AGENTS.md'), '# Mine\n\nMy rule.\n');
   writeFileSync(join(root, 'CLAUDE.md'), '# Claude\n');
   run(root, '--tasks', '--areas', 'M=Mobile');
+  // An index from before the task list existed: the user's catalog, no list.
   writeFileSync(join(root, 'docs/index.md'), '# Index\n- [[alpha]]: a\n');
   writeFileSync(join(root, 'docs/wiki/alpha.md'), '---\ntype: concept\nsummary: a\n---\n');
 
   const out = run(root);
-  assert.equal(read(root, 'docs/index.md'), '# Index\n- [[alpha]]: a\n');
+  assert.equal(read(root, 'docs/index.md'), `# Index\n\n${EMPTY_BOARD}\n\n- [[alpha]]: a\n`);
+  assert.match(out, /updated {3}docs\/index\.md \(task list\)/);
   assert.deepEqual(JSON.parse(read(root, 'docs/.sw/config.json')).areas, { M: 'Mobile' });
   const agents = read(root, 'AGENTS.md');
   assert.match(agents, /^# Mine\n\nMy rule\./);
@@ -74,6 +83,8 @@ test('re-run keeps user content and choices, and replaces only the managed block
   assert.equal(read(root, 'CLAUDE.md'), '# Claude\n');
   assert.match(out, /note\s+CLAUDE\.md does not mention AGENTS\.md/);
   for (const unchanged of ['docs/.sw/sw.mjs', 'docs/.sw/config.json', 'AGENTS.md']) assert.match(out, new RegExp(`unchanged ${unchanged.replace(/[./]/g, '\\$&')}`));
+
+  assert.match(run(root), /unchanged docs\/index\.md \(task list\)/, 'a third run changes nothing');
 });
 
 test('content that was in docs/ before is left alone and reported', () => {
@@ -82,7 +93,7 @@ test('content that was in docs/ before is left alone and reported', () => {
   writeFileSync(join(root, 'docs/index.md'), 'old index\n');
   writeFileSync(join(root, 'docs/superpowers/plans/x.md'), '[[nowhere]]\n');
   const out = run(root, '--tasks');
-  assert.equal(read(root, 'docs/index.md'), 'old index\n');
+  assert.equal(read(root, 'docs/index.md'), `${EMPTY_BOARD}\n\nold index\n`, 'an index that was there keeps its text; the task list goes above it');
   assert.match(out, /docs\/ already had content \(superpowers\)\. It was left untouched and is outside the vault\. If it holds a task index, sw-migrate converts it\./);
   assert.equal(sw(root, 'lint').status, 0, 'foreign folders are not linted');
 });

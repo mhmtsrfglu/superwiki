@@ -25,7 +25,10 @@ Run commands from the project root. `<skill-dir>` is the directory this SKILL.md
    | `plan: none` | fine for a small task: one area, three "Done when" items or fewer, nothing open in its notes, a few files. For anything larger, recommend sw-plan first and let the user choose |
    | `review: required (...)` | remember it for step 7 |
 
-3. **Mark it started** before any work: in the frontmatter of `docs/tasks/<ID>.md` set `status: in-progress` and `started:` today. Append `## [date] task | <ID> started` to `docs/log.md`, in the layout its last entries use.
+3. **Mark it started** before any work:
+   - in the frontmatter of `docs/tasks/<ID>.md`, `status: in-progress` and `started:` today;
+   - in `docs/log.md`, a new entry `## [date] task | <ID> started`, in the layout its last entries use;
+   - `node docs/.sw/sw.mjs board`, so the task list in `index.md` shows it.
 4. **Checks that need the environment.** If the task has a plan, look for `needs:` in it: `grep -n 'needs:' docs/plans/<ID>-plan.md`. Each hit is a check that starts services or changes data. Ask the user which of them may run; without a yes, none.
 5. **Dispatch the implementer** (how: "Dispatching" below). Its prompt is the task id, the project root if it is not your working directory, and which `needs:` checks it may run. Do not paste the plan into the prompt; it reads the files.
 6. **Judge the report.** Its `Requirements:` list must name every "Done when" item and every scope, state or constraint item of the task; compare it with the task file.
@@ -36,7 +39,7 @@ Run commands from the project root. `<skill-dir>` is the directory this SKILL.md
    - `Verdict: pass`: go on. Pass `important` and `minor` findings to the user in your report; they do not block.
    - `Verdict: changes needed`: dispatch the implementer again with the blocking findings, word for word, then the reviewer again with the files changed since. After two rounds that still end in `changes needed`, stop and put the findings to the user.
    - Do not review the change yourself in place of the reviewer, and do not argue a blocking finding away. If you think a finding is wrong, say so to the user and let them decide.
-8. **Record the outcome.**
+8. **Record the outcome**, then run `node docs/.sw/sw.mjs board`.
 
    | Outcome | Task file | Log entry |
    | --- | --- | --- |
@@ -50,7 +53,7 @@ Run commands from the project root. `<skill-dir>` is the directory this SKILL.md
 10. **File what else was learned.** These are separate offers: act on each only when the user says yes to that one.
     - A report held a decision or constraint the wiki should keep: offer a wiki page (`type: decision` or `concept`), added to `index.md`.
     - The task fixed a problem whose cause is now known, or the review caught a defect worth remembering: offer a `type: lesson` page (Symptom, Cause, Fix, How to notice it earlier); sw-triage finds these later.
-    - A report named follow-up work: offer to create the tasks.
+    - A report named follow-up work, or the review left `important` findings open: offer to create the tasks. A finding that lives only in the log is forgotten.
 11. **Report** to the user, in this order. Commit only if the user asks.
     - the outcome;
     - each requirement with its evidence, and anything that differs from the task;
@@ -77,6 +80,7 @@ The same table serves both roles: `sw-implementer` with `implementer.md`, `sw-re
 - Accepting a `differs` item on the user's behalf. A sensible alternative is still not what the task asked for.
 - Skipping the review on a task that requires it, or doing it yourself in the same context that judged the implementation.
 - Starting work before the task file says `in-progress`. If the session dies, nobody knows the task was touched.
-- Letting a subagent edit the task file or the log. One writer for status: you.
+- Letting a subagent edit the task file, the log or the task list. One writer for status: you.
+- Editing the task list in `index.md` by hand. It is written from the task files; change the task file and run `board`.
 - Reading the plan or the code "to follow along". The subagents already paid for that.
 - Running the next task in the same session out of momentum.

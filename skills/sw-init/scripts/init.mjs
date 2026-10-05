@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Scaffolds docs/ as a Superwiki vault. Safe to re-run: user content is kept, tool files are
 // replaced with this version, and the report says which was which.
+import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -11,6 +12,7 @@ const MANAGED_BLOCK = /<!-- sw:start[\s\S]*?<!-- sw:end -->/;
 // What a vault consists of at the top of docs/. Anything else there belongs to someone else.
 const VAULT_ENTRIES = ['index.md', 'log.md', 'raw', 'wiki', 'tasks', 'plans', 'viewer.html'];
 const ROLES = ['plan', 'implement', 'review'];
+const NEW_INDEX = '# Index\n\n## Wiki\n\nCatalog of the wiki: one line per page, `- [[file-name]]: summary`, grouped by type.\n';
 
 const HELP = `init.mjs [--root <dir>] [--tasks | --no-tasks] [--areas "M=Mobile,B=Backend"]
 
@@ -116,7 +118,7 @@ function writeVault(docs, tasks, report) {
   }
 
   const today = new Date().toISOString().slice(0, 10);
-  report.keep(join(docs, 'index.md'), '# Index\n\nCatalog of the wiki: one line per page, `- [[file-name]]: summary`, grouped by type.\n');
+  report.keep(join(docs, 'index.md'), NEW_INDEX);
   report.keep(join(docs, 'log.md'), `# Log\n\nAppend-only. Entry format: \`## [YYYY-MM-DD] kind | title\`.\n\n## [${today}] init | Superwiki vault created\n`);
 
   // The viewer snapshot and the local server's address are per-machine and regenerated on demand.
@@ -126,6 +128,18 @@ function writeVault(docs, tasks, report) {
   for (const template of ['page.md', ...(tasks ? ['task.md', 'plan.md', 'guide.md'] : [])]) {
     report.copy(join(ASSETS, 'templates', template), join(docs, '.sw', 'templates', template));
   }
+}
+
+// The task list in index.md is the one part of that file the tool owns. The vault's own CLI
+// writes it, so an upgraded vault gets the list in the format of the version just installed.
+function writeTaskBoard(docs, report) {
+  const index = join(docs, 'index.md');
+  const cli = join(docs, '.sw', 'sw.mjs');
+  if (!existsSync(cli)) return; // already reported as missing
+  const before = readFileSync(index, 'utf8');
+  const run = spawnSync(process.execPath, [cli, 'board', '--docs', docs], { encoding: 'utf8' });
+  if (run.status !== 0) return report.line('note', `the task list in docs/index.md was not written: ${run.stderr.trim()}`);
+  report.line(readFileSync(index, 'utf8') === before ? 'unchanged' : 'updated', 'docs/index.md (task list)');
 }
 
 function writeAgentRules(root, tasks, report) {
@@ -174,6 +188,7 @@ function main(argv) {
   const hadTaskFiles = !previous && existsSync(join(docs, 'tasks'));
   const report = createReport(root);
   writeVault(docs, tasks, report);
+  if (tasks) writeTaskBoard(docs, report);
   const config = buildConfig(previous, { root, tasks, areas: options.areas });
   report.write(configPath, JSON.stringify(config, null, 2) + '\n');
   writeAgentRules(root, tasks, report);

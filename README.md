@@ -17,9 +17,13 @@ Then, in a project: `/sw-init`.
 
 ## Why
 
-Superwiki follows the LLM Wiki pattern described by Andrej Karpathy: raw sources you curate, a wiki the agent owns, and a short schema that tells the agent how to maintain it. On top of that it adds what a software project needs: tasks with dependencies, plans, and a record of decisions and lessons.
+Superwiki follows the LLM Wiki pattern described by Andrej Karpathy: raw sources you curate, a wiki the agent owns, and a short schema that tells the agent how to maintain it. On top of that it adds what a software project needs: tasks with dependencies, plans, reviews, and a record of decisions and lessons.
 
-It is built to be cheap for the agent. One small index to read, one file per task, and a script that answers "what is ready?", "what blocks this?" or "is anything broken?" without the agent reading the vault.
+It is built to be cheap for the agent:
+
+- **Little to read.** One small index, one file per task, and a script that answers "what is ready?", "what blocks this?" or "is anything broken?" without the agent reading the vault.
+- **Work in clean contexts.** Planning, implementing and reviewing run in subagents, each on the model you choose for it. The main session only keeps the task's status true, so it stays small.
+- **Cost you can see.** `sw-stats` shows what a session used, per agent.
 
 Measured on a real project with 165 tasks, converted from a single markdown index:
 
@@ -29,7 +33,7 @@ Measured on a real project with 165 tasks, converted from a single markdown inde
 | Read to start one task | the index, then the task's section | one file, 2 KB at the median |
 | Marking a task done | a status cell, plus a ✅ at every reference to it (median 12 places) | one frontmatter line |
 
-> Status: early. The CLI, the viewer, `sw-init` and the migration script are tested, and the planning flow has been run in all three agents; some skills have only been exercised once. [DESIGN.md](DESIGN.md) lists what has and has not been proven.
+> Status: early. The CLI, the viewer, `sw-init` and the migration script are tested. Planning, implementing and reviewing have been run end to end on real projects in Claude Code, and the planning flow in Codex and Copilot CLI; some skills have only been exercised once. [DESIGN.md](DESIGN.md) lists what has and has not been proven.
 
 ## What you get
 
@@ -84,9 +88,13 @@ git clone https://github.com/mhmtsrfglu/superwiki ~/.superwiki
 
 A linked install follows the clone: `git pull` updates every agent. `install.sh --copy` copies instead, `--uninstall` removes.
 
-All three agents below were checked the same way: the agent found the skills, refused to start a task with an unfinished dependency, and ran `sw-plan` end to end with the planner subagent.
+### Per agent
 
-### Claude Code
+All three agents were checked the same way: the agent found the skills, refused to start a task with an unfinished dependency, and ran `sw-plan` end to end with the planner subagent.
+
+The model for each role (planning, implementing, reviewing) is set with `sw-config`, which writes one agent file per role into the project. The skills dispatch those agents by name.
+
+#### Claude Code
 
 ```bash
 npx superwiki install claude
@@ -94,11 +102,11 @@ npx superwiki install claude
 
 Invoke with a slash: `/sw-init`, `/sw-plan T-01`.
 
-Claude Code reads `~/.claude/skills/` (and a project's `.claude/skills/`); it does not read `~/.agents/skills/`, so `global` is not enough for it.
+- Claude Code reads `~/.claude/skills/` (and a project's `.claude/skills/`). It does not read `~/.agents/skills/`, so `global` is not enough for it.
+- `sw-plan` enters plan mode when the session offers it.
+- Agent files: `.claude/agents/sw-planner.md`, `sw-implementer.md` and `sw-reviewer.md`. They load when a session starts; in a session that began before they existed, the skills fall back to built-in agents with the same model.
 
-`sw-plan` enters plan mode when the session offers it. A model set with `sw-config` for `claude` applies to the planner and implementer subagents, written to `.claude/agents/`; if those agents are not loaded, the skills fall back to built-in agents with the same model.
-
-### Codex CLI
+#### Codex CLI
 
 ```bash
 npx superwiki install codex
@@ -106,9 +114,10 @@ npx superwiki install codex
 
 Invoke with a dollar sign, or by name in a sentence: `$sw-init`, `$sw-plan T-01`, "use the sw-plan skill for T-01". Checked with CLI 0.153.
 
-A skill cannot switch Codex into plan mode; start planning yourself with `/plan` if you want the mode, or let `sw-plan` proceed without it (it changes no file before you approve). A model set with `sw-config` for `codex` is written to `.codex/agents/sw-planner.toml` and `sw-implementer.toml`, and the skills spawn those agents by name. Subagents must be enabled (they are by default in current releases).
+- A skill cannot switch Codex into plan mode. Start planning yourself with `/plan` if you want the mode, or let `sw-plan` proceed without it: it changes no file before you approve.
+- Agent files: `.codex/agents/sw-planner.toml`, `sw-implementer.toml` and `sw-reviewer.toml`. Subagents must be enabled; they are by default in current releases.
 
-### GitHub Copilot CLI
+#### GitHub Copilot CLI
 
 ```bash
 npx superwiki install copilot
@@ -116,11 +125,11 @@ npx superwiki install copilot
 
 Invoke with a slash, or by name in a sentence: `/sw-init`, "use the sw-plan skill for T-01". Checked with CLI 1.0.31.
 
-Copilot CLI also reads `~/.agents/skills/`, so if you installed `codex` or `global` it already has the skills.
+- Copilot CLI also reads `~/.agents/skills/`, so if you installed `codex` or `global` it already has the skills.
+- A skill cannot switch Copilot into plan mode. Start with `copilot --mode plan` or `/plan` if you want it.
+- Agent files: `.github/agents/sw-planner.agent.md`, `sw-implementer.agent.md` and `sw-reviewer.agent.md`, dispatched with the `task` tool. Whether Copilot honours the `model:` field of those files has not been checked.
 
-A skill cannot switch Copilot into plan mode; start with `copilot --mode plan` or `/plan` if you want it. A model set with `sw-config` for `copilot` is written to `.github/agents/sw-planner.agent.md` and `sw-implementer.agent.md`; the skills dispatch them with the `task` tool. Whether Copilot honours the `model:` field of those files has not been checked.
-
-### Other agents
+#### Other agents
 
 ```bash
 npx superwiki install global
@@ -128,8 +137,9 @@ npx superwiki install global
 
 Agents that load `SKILL.md` folders from `~/.agents/skills` pick the skills up from there. For an agent with its own skills folder (Cursor, Gemini CLI, OpenCode and others), copy the `skills/sw-*` folders from a clone into it by hand. Nothing has been run in these agents. What will differ:
 
-- the skills name Claude Code, Codex and Copilot tools when they dispatch subagents; elsewhere they fall back to doing the planning or implementing in the main session, and say so;
-- `sw-config` writes agent files only for `claude`, `codex` and `copilot`, so a per-role model cannot be set.
+- the skills name Claude Code, Codex and Copilot tools when they dispatch subagents; elsewhere they fall back to doing the work in the main session, and say so;
+- `sw-config` writes agent files only for `claude`, `codex` and `copilot`, so a per-role model cannot be set;
+- `sw-stats` reads the session records of those three tools only.
 
 Everything else (the vault, the CLI, the viewer, ingest, lint, explain, triage) depends only on Node and on the agent following the skill text.
 
@@ -156,7 +166,7 @@ A project's `docs/` folder is plain markdown and keeps working as an Obsidian va
 | Skill | What it does |
 | --- | --- |
 | `sw-init` | set up `docs/` in the current project, or upgrade it |
-| `sw-migrate` | convert an existing table-based task index, on a new git branch |
+| `sw-migrate` | convert an existing table-based task index, on a git branch of its own |
 | `sw-ingest` | file a source into the wiki |
 | `sw-plan` | plan a task with the planner subagent and get your approval |
 | `sw-implement` | run a task with the implementer subagent, have it reviewed if the task asks for that, and record the result |
@@ -164,6 +174,7 @@ A project's `docs/` folder is plain markdown and keeps working as an Obsidian va
 | `sw-triage` | for a problem: seen before? lessons, likely causes |
 | `sw-lint` | structural checks by script, semantic review on request |
 | `sw-visualize` | open the viewer |
+| `sw-stats` | what the current session has cost: tokens, context, steps and tool calls, per agent |
 | `sw-config` | the model each tool uses for planning, implementing and reviewing; task areas |
 
 ### Examples
@@ -191,6 +202,7 @@ Shown as typed in Claude Code. In Codex, write `$sw-plan` instead of `/sw-plan`.
 /sw-config plan with opus, implement with sonnet, review with opus
 /sw-lint                          check links, frontmatter and task dependencies
 /sw-visualize                     open the task board and the wiki in the browser
+/sw-stats                         what this session has cost so far, per agent
 ```
 
 You do not have to type a command. The rules `sw-init` adds to `AGENTS.md` tell the agent which skill fits, so a plain request should reach the same skill:
@@ -204,6 +216,22 @@ Users get the magic-link email twice. Have we seen this before?
 
 A filled-in example vault is in [examples/demo/docs](examples/demo/docs).
 
+### What a session cost
+
+`sw-stats` reads the record your agent keeps of the session and prints one row for the main session and one for each subagent. It writes nothing. `sw-implement` ends its report with the same table. This one is a real task: planned, implemented and reviewed in 37 minutes.
+
+```text
+session  claude  fe4cbd6c-8abf-4db6-9755-469dc7321dc7  2026-10-05 10:27 to 11:04, 37 min
+agent           model              steps  first  peak   sent  cached  output  tools  min
+main            claude-opus-5-5       27    79k  126k   2.8M     96%     18k     23   37
+sw-planner      claude-opus-5-5       31    59k  154k   3.5M     96%      8k     32    6
+sw-implementer  claude-sonnet-5-5     68    59k  252k  12.2M     96%     16k     76   26
+sw-reviewer     claude-opus-5-5       23    60k  137k   2.4M     89%     372     24   12
+total                                149      -     -  20.9M     95%     43k    155
+```
+
+`first` and `peak` are the tokens sent with one request. `sent` is that, summed over every step: each step sends the whole context again, which is why a long session in one context is expensive. In Copilot CLI the token columns fill in once the session has closed.
+
 ### The CLI
 
 The skills call a small script that answers questions without the agent reading the vault. You can run it yourself, from the project root:
@@ -211,11 +239,12 @@ The skills call a small script that answers questions without the agent reading 
 ```bash
 node docs/.sw/sw.mjs status                 # counts per area
 node docs/.sw/sw.mjs ready                  # tasks that can start now
-node docs/.sw/sw.mjs check P-15             # can it start or finish, and what is open
+node docs/.sw/sw.mjs check P-15             # can it start or finish, what is open, is a review required
 node docs/.sw/sw.mjs explain P-15           # dependencies, what it unblocks, plan, area guide
 node docs/.sw/sw.mjs search sync timeout    # where something is mentioned
 node docs/.sw/sw.mjs next-id P              # next free id in an area
 node docs/.sw/sw.mjs lint                   # broken links, bad frontmatter, dependency errors
+node docs/.sw/sw.mjs stats                  # tokens, context and steps of the agent session here
 node docs/.sw/sw.mjs serve --open           # the viewer, reading files live
 node docs/.sw/sw.mjs snapshot               # or: freeze the vault into docs/viewer.html, no server
 ```
@@ -223,14 +252,23 @@ node docs/.sw/sw.mjs snapshot               # or: freeze the vault into docs/vie
 ## Develop
 
 ```bash
-npm test       # builds skills/sw-init/assets/sw.mjs, then runs the tests
+npm test       # builds skills/sw-init/assets/sw.mjs and viewer.html, then runs the tests
 ```
 
-Releases are cut by the `Release` workflow (Actions → Release → Run workflow): it tests, bumps the version in `package.json` and the plugin manifests, publishes to npm, tags, and creates a GitHub release. It publishes through npm trusted publishing, so no token is stored: the package's settings on npmjs.com name this repository and `release.yml` as its trusted publisher.
+Edit sources in `src/`:
+
+| File | What it is |
+| --- | --- |
+| `src/core.js` | the vault model, derived task state, lint and search; shared by the CLI and the viewer |
+| `src/stats.js` | reads the agents' session records |
+| `src/cli.js` | the commands |
+| `src/viewer.html` | the viewer |
+
+`scripts/build.mjs` bundles them into `skills/sw-init/assets/sw.mjs` and `viewer.html`. Those two files are generated: do not edit them.
 
 `node scripts/build-demo.mjs` builds the public demo into `site/` (the viewer with the example vault baked in); the Pages workflow deploys it on every push to `main`.
 
-`src/core.js` is shared by the CLI and the viewer. Edit sources in `src/`; the files in `skills/sw-init/assets/` named `sw.mjs` and `viewer.html` are generated.
+Releases are cut by the `Release` workflow (Actions → Release → Run workflow): it tests, bumps the version in `package.json` and the plugin manifests, publishes to npm, tags, and creates a GitHub release. It publishes with the repository secret `NPM_TOKEN`, an npm access token allowed to publish `superwiki`.
 
 ## License
 

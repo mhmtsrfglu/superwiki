@@ -1,0 +1,362 @@
+// Session statistics: what the agent session working in this project has cost so far.
+// Claude Code, Codex and Copilot CLI each keep a record of every session on disk. This finds the
+// record of the project's session and reduces it to one row per agent: the main session and each
+// subagent it started.
+import { existsSync, readFileSync, readdirSync, realpathSync, statSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join, sep } from 'node:path';
+
+export const STATS_TOOLS = ['claude', 'codex', 'copilot'];
+
+const MAIN = 'main';
+// Codex keeps every project's sessions in one tree; only the most recent files are opened.
+const CODEX_FILES_SCANNED = 100;
+
+// ---------- Reading records ----------
+
+// A record still being written can end in half a line; lines that do not parse are skipped.
+function jsonLines(path) {
+  const records = [];
+  for (const line of readFileSync(path, 'utf8').split('\n')) {
+    if (!line) continue;
+    try {
+      records.push(JSON.parse(line));
+    } catch {}
+  }
+  return records;
+}
+
+function jsonFile(path) {
+  try {
+    return JSON.parse(readFileSync(path, 'utf8'));
+  } catch {
+    return {};
+  }
+}
+
+const modifiedAt = path => statSync(path).mtimeMs;
+
+// The project root as typed and as resolved: tools record the working directory either way.
+function rootForms(root) {
+  const forms = new Set([root]);
+  try {
+    forms.add(realpathSync(root));
+  } catch {}
+  return [...forms];
+}
+
+const isWithin = (roots, dir) => Boolean(dir) && roots.some(root => dir === root || dir.startsWith(root + sep));
+
+// ---------- The summary being built ----------
+
+const newSession = (tool, id) => ({ tool, id, agents: [], tools: {}, note: '' });
+
+// Token fields stay null when the record does not hold them, so "unknown" never prints as 0.
+const newAgent = name => ({
+  name, model: '', steps: 0, first: null, peak: null, sent: null, cached: null, output: null, toolCalls: 0, start: null, end: null,
+});
+
+const plus = (sum, n) => (sum ?? 0) + (n || 0);
+
+// One model request. `context` is everything sent with it, `cached` the part read from the cache.
+function addStep(agent, { context, cached, output }) {
+  agent.steps++;
+  agent.first ??= context;
+  agent.peak = Math.max(agent.peak ?? 0, context);
+  agent.sent = plus(agent.sent, context);
+  agent.cached = plus(agent.cached, cached);
+  agent.output = plus(agent.output, output);
+}
+
+function addToolCall(session, agent, name) {
+  agent.toolCalls++;
+  session.tools[name] = (session.tools[name] || 0) + 1;
+}
+
+// Widens the agent's working period to include this record.
+function touch(agent, timestamp) {
+  const time = Date.parse(timestamp);
+  if (Number.isNaN(time)) return;
+  agent.start = Math.min(agent.start ?? time, time);
+  agent.end = Math.max(agent.end ?? time, time);
+}
+
+// Subagents are listed in the order they were started.
+const byStart = (a, b) => (a.start ?? 0) - (b.start ?? 0);
+
+// ---------- Claude Code ----------
+// ~/.claude/projects/<working directory, non-alphanumerics as dashes>/<session>.jsonl, and next to
+// it <session>/subagents/agent-<id>.jsonl with a .meta.json naming the agent type.
+
+const claudeHome = () => process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude');
+
+function claudeSessions(root) {
+  const sessions = [];
+  for (const form of rootForms(root)) {
+    const dir = join(claudeHome(), 'projects', form.replace(/[^A-Za-z0-9]/g, '-'));
+    if (!existsSync(dir)) continue;
+    for (const name of readdirSync(dir)) {
+      if (!name.endsWith('.jsonl')) continue;
+      const id = name.slice(0, -'.jsonl'.length);
+      const path = join(dir, name);
+      sessions.push({
+        tool: 'claude',
+        id,
+        modified: modifiedAt(path),
+        current: id === process.env.CLAUDE_CODE_SESSION_ID,
+        read: () => readClaude(id, path, join(dir, id, 'subagents')),
+      });
+    }
+  }
+  return sessions;
+}
+
+function readClaudeAgent(session, name, path) {
+  const agent = newAgent(name);
+  // A reply is written as one line per content block. Each line repeats the reply's usage, and
+  // only the last one has the final output count, so the last line of a reply is the one kept.
+  const replies = new Map();
+  for (const record of jsonLines(path)) {
+    touch(agent, record.timestamp);
+    const message = record.type === 'assistant' && record.message;
+    if (!message) continue;
+    for (const block of message.content || []) {
+      if (block.type === 'tool_use') addToolCall(session, agent, block.name);
+    }
+    if (message.usage) replies.set(message.id, message);
+  }
+  for (const { model, usage } of replies.values()) {
+    agent.model = model || agent.model;
+    const cached = usage.cache_read_input_tokens || 0;
+    addStep(agent, {
+      context: (usage.input_tokens || 0) + cached + (usage.cache_creation_input_tokens || 0),
+      cached,
+      output: usage.output_tokens,
+    });
+  }
+  return agent;
+}
+
+function readClaude(id, path, subagentDir) {
+  const session = newSession('claude', id);
+  session.agents.push(readClaudeAgent(session, MAIN, path));
+  if (!existsSync(subagentDir)) return session;
+  const subagents = readdirSync(subagentDir)
+    .filter(name => name.endsWith('.jsonl'))
+    .map(name => {
+      const meta = jsonFile(join(subagentDir, name.replace(/\.jsonl$/, '.meta.json')));
+      return readClaudeAgent(session, meta.agentType || 'subagent', join(subagentDir, name));
+    });
+  session.agents.push(...subagents.sort(byStart));
+  return session;
+}
+
+// ---------- Codex ----------
+// ~/.codex/sessions/<year>/<month>/<day>/rollout-*.jsonl. The first line is the session's meta:
+// its working directory and, for a subagent, the session that spawned it and its role.
+
+const codexHome = () => process.env.CODEX_HOME || join(homedir(), '.codex');
+
+function rolloutFiles(dir, found = []) {
+  if (!existsSync(dir)) return found;
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) rolloutFiles(path, found);
+    else if (entry.name.endsWith('.jsonl')) found.push({ path, modified: modifiedAt(path) });
+  }
+  return found;
+}
+
+function codexSessions(root) {
+  const roots = rootForms(root);
+  const recent = rolloutFiles(join(codexHome(), 'sessions')).sort((a, b) => b.modified - a.modified).slice(0, CODEX_FILES_SCANNED);
+  const byId = new Map();
+  for (const { path, modified } of recent) {
+    const records = jsonLines(path);
+    const meta = records[0]?.type === 'session_meta' ? records[0].payload : null;
+    if (!meta || !isWithin(roots, meta.cwd)) continue;
+    const id = meta.session_id || meta.id;
+    if (!byId.has(id)) byId.set(id, { modified: 0, files: [] });
+    const group = byId.get(id);
+    group.modified = Math.max(group.modified, modified);
+    group.files.push({ meta, records });
+  }
+  return [...byId].map(([id, { modified, files }]) => ({ tool: 'codex', id, modified, current: false, read: () => readCodex(id, files) }));
+}
+
+function readCodexAgent(session, name, records) {
+  const agent = newAgent(name);
+  let lastTotal = null;
+  for (const record of records) {
+    touch(agent, record.timestamp);
+    const payload = record.payload || {};
+    if (record.type === 'turn_context') agent.model = payload.model || agent.model;
+    if (record.type === 'response_item' && /_call$/.test(payload.type || '')) addToolCall(session, agent, payload.name || payload.type);
+    if (record.type !== 'event_msg' || payload.type !== 'token_count' || !payload.info) continue;
+    // The count is also repeated when only the rate limits change; a new request moves the total.
+    const total = payload.info.total_token_usage?.total_tokens;
+    if (total === lastTotal) continue;
+    lastTotal = total;
+    const last = payload.info.last_token_usage || {};
+    addStep(agent, { context: last.input_tokens || 0, cached: last.cached_input_tokens, output: last.output_tokens });
+  }
+  return agent;
+}
+
+function readCodex(id, files) {
+  const session = newSession('codex', id);
+  const subagents = [];
+  for (const { meta, records } of files) {
+    if (meta.thread_source === 'subagent') subagents.push(readCodexAgent(session, meta.agent_role || meta.agent_nickname || 'subagent', records));
+    else session.agents.push(readCodexAgent(session, MAIN, records));
+  }
+  session.agents.push(...subagents.sort(byStart));
+  return session;
+}
+
+// ---------- Copilot CLI ----------
+// ~/.copilot/session-state/<session>/events.jsonl, with the working directory in workspace.yaml.
+// Events of a subagent carry its agentId. Token counts are written only when the session closes.
+
+const copilotHome = () => join(homedir(), '.copilot');
+
+function copilotSessions(root) {
+  const roots = rootForms(root);
+  const base = join(copilotHome(), 'session-state');
+  if (!existsSync(base)) return [];
+  const sessions = [];
+  for (const id of readdirSync(base)) {
+    const events = join(base, id, 'events.jsonl');
+    const workspace = join(base, id, 'workspace.yaml');
+    if (!existsSync(events) || !existsSync(workspace)) continue;
+    const cwd = (readFileSync(workspace, 'utf8').match(/^cwd: (.*)$/m) || [])[1];
+    if (!isWithin(roots, cwd)) continue;
+    sessions.push({ tool: 'copilot', id, modified: modifiedAt(events), current: false, read: () => readCopilot(id, events) });
+  }
+  return sessions;
+}
+
+function readCopilot(id, path) {
+  const session = newSession('copilot', id);
+  const agents = new Map();
+  const agentOf = key => {
+    if (!agents.has(key)) agents.set(key, newAgent(key));
+    return agents.get(key);
+  };
+  agentOf(MAIN);
+  let closed = false;
+  for (const event of jsonLines(path)) {
+    const data = event.data || {};
+    const agent = agentOf(event.agentId || MAIN);
+    touch(agent, event.timestamp);
+    if (event.type === 'subagent.started') {
+      agent.name = data.agentName || agent.name;
+    } else if (event.type === 'assistant.message') {
+      agent.steps++;
+      agent.model = data.model || agent.model;
+    } else if (event.type === 'tool.execution_start') {
+      addToolCall(session, agent, data.toolName);
+    } else if (event.type === 'session.shutdown' && data.agentMetrics) {
+      // A resumed session closes more than once; each close reports the run that ended with it.
+      closed = true;
+      for (const [key, metrics] of Object.entries(data.agentMetrics)) {
+        const reported = agentOf(key);
+        for (const { usage = {} } of Object.values(metrics.modelMetrics || {})) {
+          reported.sent = plus(reported.sent, usage.inputTokens);
+          reported.cached = plus(reported.cached, usage.cacheReadTokens);
+          reported.output = plus(reported.output, usage.outputTokens);
+        }
+      }
+    }
+  }
+  session.agents = [...agents.values()];
+  if (!closed) session.note = 'Copilot writes token counts when the session closes; until then /usage shows them.';
+  return session;
+}
+
+// ---------- Choosing the session ----------
+
+const LISTERS = { claude: claudeSessions, codex: codexSessions, copilot: copilotSessions };
+
+// The session to report: the one named by `id` (a prefix is enough), else the session this command
+// runs in when the tool says which one that is, else the most recently written one.
+export function sessionStats(root, { tool, id } = {}) {
+  let sessions = (tool ? [tool] : STATS_TOOLS).flatMap(name => LISTERS[name](root));
+  if (id) sessions = sessions.filter(session => session.id.startsWith(id));
+  sessions.sort((a, b) => b.modified - a.modified);
+  const chosen = (!id && sessions.find(session => session.current)) || sessions[0];
+  return chosen ? chosen.read() : null;
+}
+
+// ---------- Printing ----------
+
+const COLUMNS = ['agent', 'model', 'steps', 'first', 'peak', 'sent', 'cached', 'output', 'tools', 'min'];
+const TEXT_COLUMNS = 2; // agent and model align left; the numbers after them align right
+const LEGEND = 'first, peak: tokens sent with one request. sent: that, summed over every step. cached: the share of sent read from the cache.';
+
+function tokens(n) {
+  if (n == null) return '-';
+  if (n < 1000) return String(n);
+  if (n < 1e6) return `${Math.round(n / 1000)}k`;
+  return `${(n / 1e6).toFixed(1)}M`;
+}
+
+const cachedShare = agent => (agent.sent ? `${Math.round((100 * (agent.cached || 0)) / agent.sent)}%` : '-');
+const minutes = (start, end) => Math.round((end - start) / 60000);
+
+function clock(time) {
+  const d = new Date(time);
+  const two = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())} ${two(d.getHours())}:${two(d.getMinutes())}`;
+}
+
+// "2026-10-05 10:27 to 11:04, 37 min"; the end repeats the date only when it is another day.
+function period(start, end) {
+  const [from, to] = [clock(start), clock(end)];
+  const sameDay = from.slice(0, 10) === to.slice(0, 10);
+  return `${from} to ${sameDay ? to.slice(11) : to}, ${minutes(start, end)} min`;
+}
+
+function sessionPeriod(agents) {
+  const timed = agents.filter(agent => agent.start != null);
+  if (!timed.length) return '';
+  return period(Math.min(...timed.map(agent => agent.start)), Math.max(...timed.map(agent => agent.end)));
+}
+
+// The sum of the agents. It has no context of its own and no period, so those cells stay empty.
+function totalOf(agents) {
+  const total = newAgent('total');
+  for (const agent of agents) {
+    total.steps += agent.steps;
+    total.toolCalls += agent.toolCalls;
+    for (const field of ['sent', 'cached', 'output']) {
+      if (agent[field] != null) total[field] = plus(total[field], agent[field]);
+    }
+  }
+  return total;
+}
+
+const cells = agent => [
+  agent.name, agent.model, String(agent.steps), tokens(agent.first), tokens(agent.peak), tokens(agent.sent), cachedShare(agent),
+  tokens(agent.output), String(agent.toolCalls), agent.start == null ? '' : String(minutes(agent.start, agent.end)),
+];
+
+function table(rows) {
+  const widths = COLUMNS.map((_, column) => Math.max(...rows.map(row => row[column].length)));
+  const pad = (cell, column) => (column < TEXT_COLUMNS ? cell.padEnd(widths[column]) : cell.padStart(widths[column]));
+  return rows.map(row => row.map(pad).join('  ').trimEnd());
+}
+
+export function formatStats(session) {
+  const { agents } = session;
+  const rows = [COLUMNS, ...agents.map(cells)];
+  if (agents.length > 1) rows.push(cells(totalOf(agents)));
+  const calls = Object.entries(session.tools).sort((a, b) => b[1] - a[1]).map(([name, count]) => `${name} ${count}`);
+  return [
+    ['session', session.tool, session.id, sessionPeriod(agents)].filter(Boolean).join('  '),
+    ...table(rows),
+    `tool calls  ${calls.join('  ') || 'none'}`,
+    LEGEND,
+    ...(session.note ? [session.note] : []),
+  ].join('\n');
+}

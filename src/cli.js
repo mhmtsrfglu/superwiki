@@ -6,6 +6,7 @@ import { createServer } from 'node:http';
 import { basename, dirname, join, resolve as resolvePath } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { VAULT_FOLDERS, buildVault, guideFor, lint, nextId, resolve, search, summary, taskOf, tasksIn, unblockedBy } from './core.js';
+import { STATS_TOOLS, formatStats, sessionStats } from './stats.js';
 
 const HELP = `sw <command> [--docs <dir>] [--json]
 
@@ -16,6 +17,8 @@ const HELP = `sw <command> [--docs <dir>] [--json]
   search <words>  pages and log entries that mention the words, best match first
   next-id <AREA>  next free task id for an area (numbers are never reused)
   lint            structural checks; exit code 1 on errors
+  stats           what the agent session here has cost so far: steps, context and tokens per agent
+                  [--session <id>] another session of this project  [--tool ${STATS_TOOLS.join('|')}]
   serve [--open]  start (or reuse) a local viewer at http://127.0.0.1:<port>/ that reads the files live
   snapshot        write docs/.sw/data.js so docs/viewer.html opens as a file, frozen at this moment`;
 
@@ -77,8 +80,8 @@ export function vaultData(docs) {
 export const dataScript = data => `window.SW_DATA = ${JSON.stringify(data).replace(/</g, '\\u003c')};\n`;
 
 // ---------- Commands ----------
-// Each command gets { docs, vault, args, flags } and returns { data, text, code? }.
-// `data` is what --json prints; `text` is the default output.
+// Each command gets { docs, vault, args, flags } and returns { data, text, code? } or
+// { error, code? }. `data` is what --json prints; `text` is the default output.
 
 function status({ vault }) {
   const s = summary(vault);
@@ -240,6 +243,17 @@ function lintCommand({ vault }) {
   };
 }
 
+// Agent sessions are recorded by the folder they ran in: the project root, which holds docs/.
+function stats({ docs, flags }) {
+  if (flags.tool && !STATS_TOOLS.includes(flags.tool)) {
+    return { error: `usage: sw stats [--session <id>] [--tool ${STATS_TOOLS.join('|')}]` };
+  }
+  const root = dirname(docs);
+  const session = sessionStats(root, { tool: flags.tool, id: flags.session });
+  if (!session) return { error: `no ${flags.tool || 'agent'} session record found for ${root}`, code: 1 };
+  return { data: session, text: formatStats(session) };
+}
+
 function snapshot({ docs }) {
   const data = vaultData(docs);
   mkdirSync(join(docs, '.sw'), { recursive: true });
@@ -347,20 +361,24 @@ const COMMANDS = {
   search: { run: searchCommand, needsVault: true },
   'next-id': { run: nextIdCommand, needsVault: true },
   lint: { run: lintCommand, needsVault: true },
+  stats: { run: stats, needsVault: false },
   snapshot: { run: snapshot, needsVault: false },
   serve: { run: serve, needsVault: false },
 };
 
+// Flags that are on or off, and flags that take the next argument as their value.
+const SWITCHES = ['json', 'open', 'foreground'];
+const OPTIONS = ['docs', 'tool', 'session'];
+
+// Anything that is not a known flag is positional, so search words may start with dashes.
 function parseArgs(argv) {
-  const flags = { json: false, open: false, foreground: false, docs: null };
+  const flags = Object.fromEntries([...SWITCHES.map(name => [name, false]), ...OPTIONS.map(name => [name, null])]);
   const positional = [];
   for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
-    if (arg === '--docs') flags.docs = argv[++i] || '.';
-    else if (arg === '--json') flags.json = true;
-    else if (arg === '--open') flags.open = true;
-    else if (arg === '--foreground') flags.foreground = true;
-    else positional.push(arg);
+    const name = argv[i].startsWith('--') ? argv[i].slice(2) : null;
+    if (SWITCHES.includes(name)) flags[name] = true;
+    else if (OPTIONS.includes(name)) flags[name] = argv[++i] ?? null;
+    else positional.push(argv[i]);
   }
   return { command: positional[0], args: positional.slice(1), flags };
 }

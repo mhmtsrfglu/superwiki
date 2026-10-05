@@ -7,7 +7,7 @@ description: Use when the user wants to implement, build, execute, start or cont
 
 Runs one task. You keep the task's status true and judge the result. The work is done by subagents that start from a clean context, on the models set in sw-config: an implementer, and a reviewer when the task asks for one. You do not read the code or the plan: their reports are your input.
 
-That split is what keeps a task cheap. A long session re-sends its whole context on every step; work done in a fresh context does not carry yours, and yours stays small because the work never enters it.
+That split is what keeps a task cheap. A long session sends its whole context again on every step; work done in a fresh context does not carry yours, and yours stays small because the work never enters it.
 
 Run commands from the project root. `<skill-dir>` is the directory this SKILL.md is in.
 
@@ -15,12 +15,16 @@ Run commands from the project root. `<skill-dir>` is the directory this SKILL.md
 
 1. **Pick the task.** Id given: use it. Otherwise `node docs/.sw/sw.mjs ready` and let the user choose; tasks already in progress come first.
 2. **Gate**: `node docs/.sw/sw.mjs check <ID>`.
-   - `can start: no  open deps: ...`: stop. Tell the user which tasks block it and offer to run the first blocker instead; do not run it unasked. Do not start the task anyway, and do not edit `deps` to get past this.
-   - `can start: n/a, status is in-progress`: this is a continuation; skip step 3.
-   - `can start: n/a, status is done` or `cancelled`: stop and ask what the user wants.
-   - `plan: ... (draft, not approved)`: stop; the plan needs the user's approval (sw-plan).
-   - `plan: none`: fine for a small task (one area, three "Done when" items or fewer, nothing open in its notes, a few files). For anything larger, recommend sw-plan first and let the user choose.
-   - `review: required (...)`: remember it for step 7.
+
+   | `check` says | Do |
+   | --- | --- |
+   | `can start: no  open deps: ...` | stop. Tell the user which tasks block it and offer to run the first blocker instead; do not run it unasked. Do not start the task anyway, and do not edit `deps` to get past this |
+   | `can start: n/a, status is in-progress` | this is a continuation; skip step 3 |
+   | `can start: n/a, status is done` or `cancelled` | stop and ask what the user wants |
+   | `plan: ... (draft, not approved)` | stop; the plan needs the user's approval (sw-plan) |
+   | `plan: none` | fine for a small task: one area, three "Done when" items or fewer, nothing open in its notes, a few files. For anything larger, recommend sw-plan first and let the user choose |
+   | `review: required (...)` | remember it for step 7 |
+
 3. **Mark it started** before any work: in the frontmatter of `docs/tasks/<ID>.md` set `status: in-progress` and `started:` today. Append `## [date] task | <ID> started` to `docs/log.md`, in the layout its last entries use.
 4. **Checks that need the environment.** If the task has a plan, look for `needs:` in it: `grep -n 'needs:' docs/plans/<ID>-plan.md`. Each hit is a check that starts services or changes data. Ask the user which of them may run; without a yes, none.
 5. **Dispatch the implementer** (how: "Dispatching" below). Its prompt is the task id, the project root if it is not your working directory, and which `needs:` checks it may run. Do not paste the plan into the prompt; it reads the files.
@@ -43,8 +47,18 @@ Run commands from the project root. `<skill-dir>` is the directory this SKILL.md
 9. **Keep the area guide, if the area has one.** `node docs/.sw/sw.mjs explain <ID>` prints `area guide:` with a path or `none`.
    - A guide exists: add the reports' `Guide:` lines to it, one line per fact under Layout, Patterns, Verify or Gotchas. Replace a line the new fact corrects, and keep the page under 60 lines.
    - No guide: do nothing. A guide is worth starting once several tasks in an area have needed the same facts; if the user asks for one, create `docs/wiki/guide-<area, lowercase>.md` from `docs/.sw/templates/guide.md` and list it in `index.md`.
-10. **File what else was learned.** If a report held a decision or constraint the wiki should keep, offer to save it as a wiki page (`type: decision` or `concept`) and add it to `index.md`. If the task fixed a problem whose cause is now known, or the review caught a defect worth remembering, offer a `type: lesson` page (Symptom, Cause, Fix, How to notice it earlier); sw-triage finds these later. If a report named follow-up work, offer to create the tasks. These are separate offers: act on each only when the user says yes to that one.
-11. **Report** to the user: outcome, each requirement with its evidence, the review verdict and findings, anything that differs from the task, files changed, and which tasks this unblocked (`node docs/.sw/sw.mjs ready`). Commit only if the user asks. End with one line: the task is recorded, so the next task is cheapest in a new session.
+10. **File what else was learned.** These are separate offers: act on each only when the user says yes to that one.
+    - A report held a decision or constraint the wiki should keep: offer a wiki page (`type: decision` or `concept`), added to `index.md`.
+    - The task fixed a problem whose cause is now known, or the review caught a defect worth remembering: offer a `type: lesson` page (Symptom, Cause, Fix, How to notice it earlier); sw-triage finds these later.
+    - A report named follow-up work: offer to create the tasks.
+11. **Report** to the user, in this order. Commit only if the user asks.
+    - the outcome;
+    - each requirement with its evidence, and anything that differs from the task;
+    - the review verdict and its findings;
+    - the files changed;
+    - the tasks this unblocked (`node docs/.sw/sw.mjs ready`);
+    - what the task cost: run `node docs/.sw/sw.mjs stats` and show its table as printed;
+    - one last line: the task is recorded, so the next task is cheapest in a new session.
 
 ## Dispatching
 

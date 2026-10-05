@@ -47,7 +47,11 @@ The design is driven by what an agent must read and write per task.
 
 ## Cost of a task
 
-What a task costs is what the agents read, and each extra step re-sends everything read so far. The rules below come from measurements on one real project (a large monorepo) with small panel tasks, the planner on one model and the implementer on a cheaper one. Each figure is a single run: read it as direction, not as a number to expect elsewhere.
+What a task costs is what the agents read, and each extra step sends everything read so far again. The rules below come from measurements on two real projects. Each figure is a single run: read it as direction, not as a number to expect elsewhere.
+
+### What one subagent reads
+
+Measured on a large monorepo with small panel tasks, the planner on one model and the implementer on a cheaper one. The figure is the context a flow's subagents used.
 
 | Flow | Context used |
 | --- | --- |
@@ -65,21 +69,50 @@ A check that starts services or changes data is marked `needs:` in the plan and 
 
 ### Why the work runs in subagents
 
-The session logs of a second project, where planning, implementing and reviewing all ran in one long session, show what the alternative costs: 352 steps sent 100 million input tokens, an average of 284k per step, with contexts between 250k and 640k. Every step paid for the whole accumulated context, and a session held 70k tokens before it had read anything.
+The second project had planned, implemented and reviewed in one long session. Its session records show what that costs: 352 steps sent 100 million input tokens, an average of 284k per step, with contexts between 250k and 640k. Every step paid for the whole accumulated context.
 
 Superwiki therefore keeps the main session out of the work. It reads the task file and the reports; the code, the plan and the review are read in subagents that start clean and end with the task. Two consequences:
 
 - **A review is a separate, clean context.** A task whose frontmatter has `review:` is reviewed by a reviewer subagent after the implementer's report passes: it lists what the change claims, tries to break each claim, and classifies what it finds. It sees the change, not the reasoning that produced it, and its instructions forbid editing the repository. Blocking findings go back to the implementer, twice at most, then to the user.
 - **One task, one session.** `sw-implement` ends by saying so. The task is recorded in files, so nothing is lost by starting fresh, and the next task does not pay for this one's history.
 
-Running subagents is not free: each one reads the task and the code again. The saving comes from moving many steps out of a large context into a small one, so it grows with the length of the work. It has been estimated from the two projects above, not yet measured on one task run both ways.
+The same project then ran one task this way: planned, implemented, reviewed, one blocking finding fixed and reviewed again, done in 37 minutes.
+
+| Agent | Steps | Context, first to largest request | Tokens sent |
+| --- | --- | --- | --- |
+| Main session | 27 | 79k to 126k | 2.8M |
+| Planner | 31 | 59k to 154k | 3.5M |
+| Implementer | 68 | 59k to 252k | 12.2M |
+| Reviewer | 23 | 60k to 137k | 2.4M |
+
+What it shows:
+
+- The main session averaged 104k per step, against 284k before, and never came near the old contexts.
+- The cost moved into the implementer: more than half of the tokens sent. Its context grew fourfold, partly because the fix rounds continued the same agent, which keeps what it has read. Sending a fix to a fresh implementer would start small but read the code again; which is cheaper has not been measured.
+- Every agent starts at 59k to 79k before it reads anything: the project's rules, plugins and tool definitions. That is outside Superwiki and is paid on every step of every agent.
+
+This is not the same task run both ways, so it shows direction and not a ratio.
+
+## Session statistics
+
+The measurements above were first made by hand, from the session records the tools keep. `sw.mjs stats` (`src/stats.js`) is that measurement as a command, so every project can see where its tokens go. It finds the project's session, reduces the record to one row per agent (the main session and each subagent) and prints steps, the context of the first and the largest request, tokens sent in total, the cached share, output, tool calls and minutes. `sw-stats` shows the table and `sw-implement` closes its report with it.
+
+It writes nothing: the numbers describe a session, not the project.
+
+| Tool | Record | What it holds |
+| --- | --- | --- |
+| Claude Code | `~/.claude/projects/<project>/<session>.jsonl`, subagents in a folder beside it | usage per request |
+| Codex | `~/.codex/sessions/<date>/rollout-*.jsonl`, one file per agent, joined by session id | usage per request |
+| Copilot CLI | `~/.copilot/session-state/<session>/events.jsonl` | totals per agent, written when the session closes; steps and tool calls before that |
+
+The session reported is the one the command runs in where the tool names it (Claude Code sets its id in the environment), otherwise the project's most recently written one. These formats are not documented by their vendors and can change with a release; the command then reports less, and the tests pin the shapes it reads.
 
 ## Skills
 
 | Skill | Purpose |
 | --- | --- |
 | `sw-init` | scaffold the vault, the viewer and the schema block |
-| `sw-migrate` | convert a table-based task index, on a new git branch |
+| `sw-migrate` | convert a table-based task index, on a git branch of its own |
 | `sw-ingest` | turn a raw source into wiki pages |
 | `sw-plan` | decide whether a plan is needed; have the planner subagent write it; get approval |
 | `sw-implement` | run a task with the implementer subagent, check every requirement, have it reviewed where the task asks for that, record the result |
@@ -87,6 +120,7 @@ Running subagents is not free: each one reads the task and the code again. The s
 | `sw-triage` | for a reported problem: earlier occurrences, lessons, likely causes; fixes nothing |
 | `sw-lint` | script checks first; semantic review as a separate, approved pass |
 | `sw-visualize` | open the viewer |
+| `sw-stats` | what the current session has cost, per agent; prints, writes nothing |
 | `sw-config` | areas, and the model each tool uses for planning, implementing and reviewing |
 
 The schema block in `AGENTS.md` holds the rules that must apply without any command: read the index first, keep task status and the log current, log work that belongs to no task. It also tells the agent which skill to reach for without being asked, ahead of other planning or debugging skills; a skill's description alone proved too weak a trigger when another skill set competes for the same words.
@@ -99,7 +133,7 @@ No tool lets a skill change the running session's model, and only Claude Code le
 
 ## Viewer and CLI
 
-`src/core.js` holds the vault model, derived task state, lint and search. It is bundled into `docs/.sw/sw.mjs` for Node and inlined into `docs/viewer.html` for the browser, so both report the same findings.
+`src/core.js` holds the vault model, derived task state, lint and search. It is bundled into `docs/.sw/sw.mjs` for Node, together with the session statistics and the commands, and inlined into `docs/viewer.html` for the browser, so both report the same findings.
 
 `sw-init` copies the CLI and the viewer into the project, so skills call `node docs/.sw/sw.mjs` the same way in every agent, and a project keeps working with the version it was set up with.
 
@@ -115,24 +149,27 @@ A mapping can keep any column as a frontmatter field (a review class becomes `re
 
 | Part | Evidence |
 | --- | --- |
-| Core, CLI, installer | unit tests (`npm test`) |
+| Core, CLI, installer, session statistics | unit tests (`npm test`) |
 | Viewer | headless Chromium on the demo vault and on a migrated 165-task project |
 | `sw-init` | followed by a fresh agent on a scratch project |
-| `sw-migrate` | an earlier version followed twice by a fresh agent on a real 165-task project; an independent parse of the source confirmed every field of every task, all detail text and zero broken links. The current script (inspect, extra fields, `archiveAlso`) converts a copy of a second, 48-task project with matching counts and no lint findings; the current skill text has not been followed by an agent |
+| `sw-migrate` | an earlier version followed twice by a fresh agent on a 165-task project; an independent parse of the source confirmed every field of every task, all detail text and zero broken links. The current version converted a second, 48-task project in place: counts matched the old tables and lint found nothing. That run was made by the session that wrote the skill, not by a fresh agent |
 | `sw-ingest`, `sw-lint`, `sw-explain`, `sw-triage` | followed once by a fresh agent on a copy of the demo vault, then revised |
 | `sw-implement` without a plan | run three times on real tasks with the implementer on a cheaper model; code, tests and repository checks passed each time, the visual checks were not allowed to run |
-| `sw-plan` with `sw-implement` | run end to end once on a real task with an earlier version of both skills |
+| `sw-plan`, `sw-implement` and the review, current versions | run end to end once in Claude Code on a real task that required a review. The generated `sw-planner`, `sw-implementer` and `sw-reviewer` agents were dispatched by name on their configured models; the reviewer returned one blocking finding, the implementer fixed it, the second review passed. The resulting code was not judged independently |
+| `sw.mjs stats` | run on real session records: Claude Code 2.1 (the task above, three subagents), Codex CLI 0.153 and Copilot CLI 1.0.91 (one short session each, with one subagent). The Copilot totals match the tool's own closing record |
 | Codex CLI 0.153, Copilot CLI 1.0.31 | skills found; a blocked task refused; `sw-plan` run with the generated planner agent, earlier skill version |
 
 ## Open questions
 
-- Whether the cost rules hold on a project unlike the one they were measured on.
-- The current planner and implementer instructions, including the requirement list, have not been run; neither has `sw-plan` since the planner began writing the plan file itself.
-- The review step and the reviewer's instructions have not been run.
-- Whether running the work in subagents saves what the estimate says, measured on one task both ways.
+- Whether the cost rules hold on projects unlike the two they were measured on.
+- Whether running the work in subagents saves what the measurements suggest, on one task run both ways.
+- Whether a fix after a review is cheaper in the implementer that did the work or in a fresh one.
 - Whether the schema block makes agents reach for the skills unprompted.
-- Claude Code: the generated `sw-planner` and `sw-implementer` agents and presenting a plan through plan mode have not been tried; every run so far used the fallback agents.
+- Whether a reviewer told not to edit the repository always complies: its instructions forbid it, its permissions do not.
+- Claude Code: presenting a plan through plan mode has not been tried.
+- Codex and Copilot CLI: `sw-implement`, the review and the current `sw-plan` have not been run there.
 - Copilot CLI: whether the `model:` field of a generated agent file is honoured.
-- `sw-visualize` skill text has not been followed by an agent.
+- `sw.mjs stats`: a Copilot session that was resumed closes more than once, and the command adds the closing records up; whether each one covers only its own run has not been checked. Codex and Copilot sessions longer than a few steps have not been read.
+- `sw-visualize` and `sw-stats` skill texts have not been followed by an agent.
 - Plugin manifests (`.claude-plugin`, `.codex-plugin`) validate but have not been installed.
 - Migration leaves links in files outside `docs/` (for example `architecture.md`) pointing at archived files.

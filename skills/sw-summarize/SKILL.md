@@ -30,14 +30,14 @@ Run commands from the project root.
    | the commands the implementer reported | no plan, and a report is in this session |
    | you choose it | otherwise, or the listed command does not prove the item |
 
-   A requirement about text (a document mentions something, a file exists, a format is described) is proven by `grep`, `test -f` or `lint`, not by having written the text. A check marked `needs:` (it starts a service, opens a browser, changes data) runs only if the user allowed it.
+   A requirement about text (a document mentions something, a file exists, a format is described) is proven by `grep`, `test -f` or `lint`, not by having written the text. A check needs the environment when it starts a service, needs a running stack or changes data. It runs only if the user allowed it: under sw-implement the answer is on that skill's list of such checks; when you summarize outside it, ask the user before you run one.
 4. **Run every command now and read the result.** Exit code first, then the line that shows the item holds: the test count, the matching line, the `0 errors`.
 
    | What you have | Verdict |
    | --- | --- |
    | the command ran in this session, exited as expected, and its output shows the item | `verified` |
    | the command ran and shows the item does not hold | `failed` |
-   | no command was run: a `needs:` check that was not allowed, nothing that can prove it, or only someone's word | `unverified`, with the reason |
+   | no command was run: a check that needs the environment and was not allowed, nothing that can prove it, or only someone's word | `unverified`, with the reason |
    | the command proves part of the item | `unverified`, saying which part is open |
 
 5. **Write the section** in the format below. It is the last section of the file. If the file already has a `## Summary`, replace it whole; every verdict in the new one comes from this session. Leave the frontmatter and the other sections as they are.
@@ -96,6 +96,6 @@ Source: `git status --porcelain` at <short HEAD>.
 - "The file was written, so the item is met." Run the `grep` or `test -f`.
 - Listing changed files from what you remember of the session. Git knows; ask it.
 - Softening a `failed` or `unverified` into `verified` with a note. A note does not open the gate; the verdict does.
-- Running a `needs:` check that was not allowed, because the summary would otherwise stay incomplete. It stays incomplete, and the task stays open.
+- Running a check that needs the environment and was not allowed, because the summary would otherwise stay incomplete. It stays incomplete, and the task stays open.
 - Setting `done` by hand on a task that requires a review.
 - Keeping parts of an old summary. Evidence from another session is not fresh.

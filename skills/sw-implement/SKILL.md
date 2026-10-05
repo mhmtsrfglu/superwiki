@@ -30,22 +30,29 @@ Run commands from the project root. `<skill-dir>` is the directory this SKILL.md
    - in the frontmatter of `docs/tasks/<ID>.md`, `status: in-progress` and `started:` today;
    - in `docs/log.md`, a new entry `## [date] task | <ID> started`, in the layout its last entries use;
    - `node docs/.sw/sw.mjs board`, so the task list in `index.md` shows it.
-4. **Checks that need the environment.** If the task has a plan, look for `needs:` in it: `grep -n 'needs:' docs/plans/<ID>-plan.md`. Each hit is a check that starts services or changes data. Ask the user which of them may run; without a yes, none. The answer holds for the implementer, the reviewer and your own summary.
-5. **Dispatch the implementer** (how: "Dispatching" below). Its prompt is the task id, the project root if it is not your working directory, and which `needs:` checks it may run. Do not paste the plan into the prompt; it reads the files.
+4. **Checks that need the environment.** A check needs the environment when it starts a service, needs a running stack or changes data. Keep one list of them, each `allowed` or `not allowed`; it holds for the implementer, the reviewer and your own summary.
+   - With a plan: each hit of `grep -n 'needs:' docs/plans/<ID>-plan.md` is such a check. Ask the user which may run; without a yes a check is `not allowed`.
+   - Without a plan the list starts empty; step 6 fills it.
+5. **Dispatch the implementer**: the first row under "Dispatching".
 6. **Judge the report.** Its `Requirements:` list must name every "Done when" item and every scope, state or constraint item of the task; compare it with the task file.
    - `met` needs evidence: a command or test and its result. You do not re-run it here; step 8 runs a command for every item.
+   - `built, not verified`: the item's only check needs the environment and was not allowed. Ask the user once, in one question, whether each such check not yet answered may run, and add the answers to the list. Then go on either way, with no new implementer: the reviewer and your summary run what is allowed, and a check that cannot run leaves its item `unverified` in the summary and the task `in-progress`.
+   - `differs`: the item could not be built as worded. That is the user's call: show it and ask.
+     - Accepted: rewrite that "Done when" item in the task file to what was built, and add to "Notes" `- Changed <date>, accepted by the user: item <n> was "<old wording>"; reason: <why>.` (`<n>`: its position under "Done when"). The reviewer and the summary then read one wording.
+     - Not accepted: a fix round whose entry is the item in the task's wording.
    - `not met`, or missing from the list: the task is not done.
-   - `differs`: the implementer built something other than what the task says. That is the user's call: show it and ask. Until they accept it, the item is not met.
-7. **Review, if the task requires it.** Only when every requirement is met or accepted: dispatch the reviewer with the task id, the files the implementer changed, and which `needs:` checks it may run.
+
+   A fix round's report marks each entry `fixed` or `not fixed`. A `not fixed` entry goes to the user with the implementer's reason. Unless they accept what stands, no review is spent on it: go to step 8.
+7. **Review, if the task requires it.** It starts when every requirement is `met`, `built, not verified` or accepted: the review row under "Dispatching".
    - `Verdict: pass`: go on. Pass `important` and `minor` findings to the user in your report; they do not block.
-   - `Verdict: changes needed`: dispatch the implementer again with the blocking findings, word for word, then the reviewer again with the files changed since. After two rounds that still end in `changes needed`, stop and put the findings to the user.
+   - `Verdict: changes needed`: a fix round with the blocking findings, then the review row again, with those findings under `Recheck:`; one that comes back `still open` is blocking. After two such rounds that still end in `changes needed`, stop and put the findings to the user.
    - Do not review the change yourself in place of the reviewer, and do not argue a blocking finding away. If you think a finding is wrong, say so to the user and let them decide.
 8. **Summarize.** Follow sw-summarize for the task, yourself, in this session: it runs one command per "Done when" item, writes the `## Summary` section into the task file and appends the `summary` log entry. This step is not optional and is not delegated to the implementer. Run it whenever the implementer's work is in, also when an item is not met: the summary then records what is open. It does not set the status; step 9 does.
 9. **Record the outcome**, then run `node docs/.sw/sw.mjs board`.
 
    | Outcome | Task file | Log entry, after the `summary` entry |
    | --- | --- | --- |
-   | Every requirement met or accepted, review passed where required, and `check <ID>` says `can finish: yes` (every item in the summary is `verified`) | `status: done`, `finished:` today | `task \| <ID> done`, then one body line with the summary's count and, where it ran, the review verdict |
+   | No requirement `not met`, every `differs` item accepted, review passed where required, and `check <ID>` says `can finish: yes` (every item in the summary is `verified`) | `status: done`, `finished:` today | `task \| <ID> done`, then one body line with the summary's count and, where it ran, the review verdict |
    | Requirements met and verified but soft deps open | stays `in-progress` | `task \| <ID> waiting on <ids>` |
    | The summary holds an `unverified` or `failed` item | stays `in-progress`; add to "Notes" what each open item needs | `task \| <ID> blocked: <n> unverified, <m> failed` |
    | Anything else not met, not reviewed or awaiting the user's call | stays `in-progress`; add what is left to "Notes" | `task \| <ID> blocked: <reason>` |
@@ -60,8 +67,8 @@ Run commands from the project root. `<skill-dir>` is the directory this SKILL.md
 12. **Report** to the user, in this order. Commit only if the user asks.
     - the outcome;
     - what was planned, and what was built with each deviation from the plan, as the Summary's Plan and Implementation parts say it;
-    - each "Done when" item with its verdict and command, taken from the Summary, and anything that differs from the task;
-    - the review verdict and its findings;
+    - each "Done when" item with its verdict and command, taken from the Summary, and each item rewritten after an accepted difference, with its old wording;
+    - the review verdict and its findings, and the implementer's open decisions;
     - the files changed, as the Summary lists them;
     - the tasks this unblocked (`node docs/.sw/sw.mjs ready`);
     - what the task cost: run `node docs/.sw/sw.mjs stats` and show its table as printed;
@@ -69,7 +76,17 @@ Run commands from the project root. `<skill-dir>` is the directory this SKILL.md
 
 ## Dispatching
 
-The same table serves both roles: `sw-implementer` with `implementer.md`, `sw-reviewer` with `reviewer.md`, model from `models.implement` or `models.review`. The summary of step 8 has no role and no subagent: it is yours.
+What each dispatch gets:
+
+| Dispatch | Goes to | Prompt |
+| --- | --- | --- |
+| implementer | a fresh implementer | `<ID>`; `Checks:` |
+| fix round | the implementer that did the work where the tool can continue it (a further message to that agent), otherwise a fresh one | first line `Fix round for <ID>:`, then each entry word for word; `Checks:` |
+| review | a fresh reviewer, every time | `<ID>`; `Files:`, every file the task has changed (the implementer's list plus each fix round's); `Checks:`; from the second review on `Recheck:`, the previous review's blocking findings word for word |
+
+`Checks:` is the list of step 4, one line per check, `- <check>: allowed` or `- <check>: not allowed`; leave the block out while the list is empty. Every prompt names the project root if it is not your working directory.
+
+How to dispatch is the same for both roles: `sw-implementer` with `implementer.md`, `sw-reviewer` with `reviewer.md`, model from `models.implement` or `models.review`.
 
 | Tool | How |
 | --- | --- |
@@ -80,13 +97,8 @@ The same table serves both roles: `sw-implementer` with `implementer.md`, `sw-re
 
 ## Common mistakes
 
-- Marking `done` because the implementer said so. Done means every "Done when" item is `verified` in the summary, by a command run in this session.
-- Skipping the summary because the implementer's report looked complete. The report is a claim; the summary is the check.
-- Writing `verified` from the implementer's report without running the command.
+- Marking `done`, or writing `verified`, from the implementer's report. The report is a claim; the check is the summary's commands, run in this session.
 - Accepting a `differs` item on the user's behalf. A sensible alternative is still not what the task asked for.
-- Skipping the review on a task that requires it, or doing it yourself in the same context that judged the implementation.
-- Starting work before the task file says `in-progress`. If the session dies, nobody knows the task was touched.
+- Giving a later review only the files the fix touched. A finding in an untouched file is then never rechecked.
 - Letting a subagent edit the task file, the log or the task list. One writer for status and for the summary: you.
-- Editing the task list in `index.md` by hand. It is written from the task files; change the task file and run `board`.
 - Reading the plan or the code "to follow along". The subagents already paid for that; the summary reads only the plan's approach and verification.
-- Running the next task in the same session out of momentum.

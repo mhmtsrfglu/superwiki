@@ -1,5 +1,5 @@
 // Bundles src/ into the files sw-init copies into a project:
-//   skills/sw-init/assets/sw.mjs       core + session statistics + CLI, one dependency-free file
+//   skills/sw-init/assets/sw.mjs       the CLI and everything it uses, one dependency-free file
 //   skills/sw-init/assets/viewer.html  viewer with the core inlined
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
@@ -11,7 +11,8 @@ const assets = join(root, 'skills/sw-init/assets');
 const read = p => readFileSync(join(root, p), 'utf8');
 mkdirSync(assets, { recursive: true });
 
-const CLI_MODULES = ['src/core.js', 'src/stats.js', 'src/cli.js'];
+// In dependency order: a module comes after the modules it imports from.
+const CLI_MODULES = ['src/core.js', 'src/sessions.js', 'src/stats.js', 'src/doctor.js', 'src/cli.js'];
 
 // Joins ES modules into one file. Imports between the modules are dropped, since their code is in
 // the bundle; imports from Node are merged, since a file can import a name only once.

@@ -6,7 +6,11 @@ import { createServer } from 'node:http';
 import { basename, dirname, join, resolve as resolvePath } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { VAULT_FOLDERS, buildVault, guideFor, lint, nextId, resolve, search, summary, taskOf, tasksIn, unblockedBy } from './core.js';
-import { STATS_TOOLS, formatStats, sessionStats } from './stats.js';
+import { formatStartContext, startContext } from './doctor.js';
+import { SESSION_TOOLS, findSession } from './sessions.js';
+import { formatStats, sessionStats } from './stats.js';
+
+const SESSION_FLAGS = `[--session <id>] [--tool ${SESSION_TOOLS.join('|')}]`;
 
 const HELP = `sw <command> [--docs <dir>] [--json]
 
@@ -18,7 +22,8 @@ const HELP = `sw <command> [--docs <dir>] [--json]
   next-id <AREA>  next free task id for an area (numbers are never reused)
   lint            structural checks; exit code 1 on errors
   stats           what the agent session here has cost so far: steps, context and tokens per agent
-                  [--session <id>] another session of this project  [--tool ${STATS_TOOLS.join('|')}]
+  doctor          what that session carried before it read anything: rule files, skill and tool lists
+                  both take ${SESSION_FLAGS} to look at another session of this project
   serve [--open]  start (or reuse) a local viewer at http://127.0.0.1:<port>/ that reads the files live
   snapshot        write docs/.sw/data.js so docs/viewer.html opens as a file, frozen at this moment`;
 
@@ -79,7 +84,7 @@ export function vaultData(docs) {
 // "<" is escaped so page text can never close the script element the viewer loads this with.
 export const dataScript = data => `window.SW_DATA = ${JSON.stringify(data).replace(/</g, '\\u003c')};\n`;
 
-// ---------- Commands ----------
+// ---------- Vault commands ----------
 // Each command gets { docs, vault, args, flags } and returns { data, text, code? } or
 // { error, code? }. `data` is what --json prints; `text` is the default output.
 
@@ -243,23 +248,37 @@ function lintCommand({ vault }) {
   };
 }
 
-// Agent sessions are recorded by the folder they ran in: the project root, which holds docs/.
-function stats({ docs, flags }) {
-  if (flags.tool && !STATS_TOOLS.includes(flags.tool)) {
-    return { error: `usage: sw stats [--session <id>] [--tool ${STATS_TOOLS.join('|')}]` };
-  }
-  const root = dirname(docs);
-  const session = sessionStats(root, { tool: flags.tool, id: flags.session });
-  if (!session) return { error: `no ${flags.tool || 'agent'} session record found for ${root}`, code: 1 };
-  return { data: session, text: formatStats(session) };
-}
-
 function snapshot({ docs }) {
   const data = vaultData(docs);
   mkdirSync(join(docs, '.sw'), { recursive: true });
   writeFileSync(join(docs, '.sw', 'data.js'), dataScript(data));
   const text = `snapshot: ${data.files.length} files -> docs/.sw/data.js`;
   return { data: { files: data.files.length }, text };
+}
+
+// ---------- Session commands ----------
+// These read the record an agent tool keeps of a session, not the vault. Tools file a session
+// under the folder it ran in: the project root, which holds docs/.
+
+function sessionArg(command, { docs, flags }) {
+  if (flags.tool && !SESSION_TOOLS.includes(flags.tool)) return { error: `usage: sw ${command} ${SESSION_FLAGS}` };
+  const root = dirname(docs);
+  const session = findSession(root, { tool: flags.tool, id: flags.session });
+  return session || { error: `no ${flags.tool || 'agent'} session record found for ${root}`, code: 1 };
+}
+
+function statsCommand(ctx) {
+  const session = sessionArg('stats', ctx);
+  if (session.error) return session;
+  const stats = sessionStats(session);
+  return { data: stats, text: formatStats(stats) };
+}
+
+function doctorCommand(ctx) {
+  const session = sessionArg('doctor', ctx);
+  if (session.error) return session;
+  const report = startContext(session);
+  return { data: report, text: formatStartContext(report) };
 }
 
 // ---------- Viewer server ----------
@@ -361,7 +380,8 @@ const COMMANDS = {
   search: { run: searchCommand, needsVault: true },
   'next-id': { run: nextIdCommand, needsVault: true },
   lint: { run: lintCommand, needsVault: true },
-  stats: { run: stats, needsVault: false },
+  stats: { run: statsCommand, needsVault: false },
+  doctor: { run: doctorCommand, needsVault: false },
   snapshot: { run: snapshot, needsVault: false },
   serve: { run: serve, needsVault: false },
 };

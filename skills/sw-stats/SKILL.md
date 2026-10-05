@@ -24,7 +24,7 @@ It reports the session it runs in. For another session of this project, add `--s
    | --- | --- |
    | one agent's `sent` is most of the total | which agent, and its share. That is where the session's cost is |
    | an agent's `peak` is several times its `first` | its context grew during the work; `steps` times a large context is what makes `sent` large |
-   | `first` is large for `main` | the session starts heavy before it reads anything: rules files, plugins and tool definitions. The tool's own context command shows what fills it |
+   | `first` is large, for `main` or for the subagents | every agent starts heavy before it reads anything: rules, memory, and the lists of skills and tools. sw-doctor shows what fills it and what can go |
    | `cached` is well below the others for one agent | much of what it sent was not served from the cache, which costs more per token. Long pauses do that |
    | `main` has many `steps` or a `peak` far above its `first` | work is running in the main session that a subagent could do in a clean context |
 
@@ -36,7 +36,7 @@ So that you can answer a question about them:
 
 - `steps`: model requests. `tools`: tool calls. `min`: minutes between the agent's first and last record.
 - `first`, `peak`: tokens sent with the first request and with the largest one.
-- `sent`: tokens sent, summed over every step. A step re-sends the whole context, so this is far larger than `peak`.
+- `sent`: tokens sent, summed over every step. A step sends the whole context again, so this is far larger than `peak`.
 - `cached`: the share of `sent` that was read from the cache.
 - `output`: tokens the model wrote.
 - `-`: the tool's record does not hold that number.

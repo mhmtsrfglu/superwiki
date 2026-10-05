@@ -23,7 +23,7 @@ It is built to be cheap for the agent:
 
 - **Little to read.** One small index, one file per task, and a script that answers "what is ready?", "what blocks this?" or "is anything broken?" without the agent reading the vault.
 - **Work in clean contexts.** Planning, implementing and reviewing run in subagents, each on the model you choose for it. The main session only keeps the task's status true, so it stays small.
-- **Cost you can see.** `sw-stats` shows what a session used, per agent.
+- **Cost you can see.** `sw-stats` shows what a session used, per agent; `sw-doctor` shows what every session carries before it starts, and what can go.
 
 Measured on a real project with 165 tasks, converted from a single markdown index:
 
@@ -139,7 +139,7 @@ Agents that load `SKILL.md` folders from `~/.agents/skills` pick the skills up f
 
 - the skills name Claude Code, Codex and Copilot tools when they dispatch subagents; elsewhere they fall back to doing the work in the main session, and say so;
 - `sw-config` writes agent files only for `claude`, `codex` and `copilot`, so a per-role model cannot be set;
-- `sw-stats` reads the session records of those three tools only.
+- `sw-stats` and `sw-doctor` read the session records of those three tools only.
 
 Everything else (the vault, the CLI, the viewer, ingest, lint, explain, triage) depends only on Node and on the agent following the skill text.
 
@@ -157,7 +157,7 @@ npx superwiki@latest install claude      # update: same command, newest release
 npx superwiki uninstall all
 ```
 
-After an update, run `sw-init` again in each project: it replaces `docs/.sw/sw.mjs`, the templates and `docs/viewer.html` with the new version and keeps your content.
+After an update, run `sw-init` again in each project: it replaces `docs/.sw/sw.mjs`, the templates and `docs/viewer.html` with the new version and keeps your content. Until then the project keeps the script it was set up with, and a skill that needs a newer command says so.
 
 A project's `docs/` folder is plain markdown and keeps working as an Obsidian vault without Superwiki.
 
@@ -175,6 +175,7 @@ A project's `docs/` folder is plain markdown and keeps working as an Obsidian va
 | `sw-lint` | structural checks by script, semantic review on request |
 | `sw-visualize` | open the viewer |
 | `sw-stats` | what the current session has cost: tokens, context, steps and tool calls, per agent |
+| `sw-doctor` | what a session carries before any work, and what to remove to make every step cheaper |
 | `sw-config` | the model each tool uses for planning, implementing and reviewing; task areas |
 
 ### Examples
@@ -203,6 +204,7 @@ Shown as typed in Claude Code. In Codex, write `$sw-plan` instead of `/sw-plan`.
 /sw-lint                          check links, frontmatter and task dependencies
 /sw-visualize                     open the task board and the wiki in the browser
 /sw-stats                         what this session has cost so far, per agent
+/sw-doctor                        what fills the context before any work, and what can go
 ```
 
 You do not have to type a command. The rules `sw-init` adds to `AGENTS.md` tell the agent which skill fits, so a plain request should reach the same skill:
@@ -232,6 +234,24 @@ total                                149      -     -  20.9M     95%     43k    
 
 `first` and `peak` are the tokens sent with one request. `sent` is that, summed over every step: each step sends the whole context again, which is why a long session in one context is expensive. In Copilot CLI the token columns fill in once the session has closed.
 
+### What a session starts with
+
+Every agent above began at 59k to 79k tokens before it had read anything, and paid for that on each of its steps. `sw-doctor` shows what that start is made of, from the same session record, and proposes what to switch off for this project. The same session:
+
+```text
+context at session start  claude  fe4cbd6c-8abf-4db6-9755-469dc7321dc7
+first request: 79k tokens
+part                             size  holds
+rule and memory files           30 KB  memory/MEMORY.md 18 KB, my-app/AGENTS.md 11 KB, ...
+skill list                      29 KB  213: marketing-skills 41, (none) 37, claude-seo 25, claude-ads 23, +11 more
+tool names (loaded on demand)   17 KB  381: claude_ai_higgsfield 116, claude_ai_meta_ads 98, +9 more
+agent list                      14 KB  46: claude-seo 18, (none) 12, claude-ads 10, +4 more
+MCP server instructions        8.3 KB  claude.ai higgsfield 2.0 KB, notebooklm 2.0 KB, ...
+session-start hooks            3.3 KB
+```
+
+Here most of the skills, agents and tools came from advertising and SEO plugins that this project never uses. The skill proposes changes and asks before making any; it touches project-local settings only, and never uninstalls a plugin or deletes a memory. Sizes are characters of text: a skill cannot run your agent's own context command (`/context` in Claude Code and Copilot CLI, `/status` in Codex), which shows the same in tokens.
+
 ### The CLI
 
 The skills call a small script that answers questions without the agent reading the vault. You can run it yourself, from the project root:
@@ -245,6 +265,7 @@ node docs/.sw/sw.mjs search sync timeout    # where something is mentioned
 node docs/.sw/sw.mjs next-id P              # next free id in an area
 node docs/.sw/sw.mjs lint                   # broken links, bad frontmatter, dependency errors
 node docs/.sw/sw.mjs stats                  # tokens, context and steps of the agent session here
+node docs/.sw/sw.mjs doctor                 # what that session carried before it read anything
 node docs/.sw/sw.mjs serve --open           # the viewer, reading files live
 node docs/.sw/sw.mjs snapshot               # or: freeze the vault into docs/viewer.html, no server
 ```
@@ -260,7 +281,9 @@ Edit sources in `src/`:
 | File | What it is |
 | --- | --- |
 | `src/core.js` | the vault model, derived task state, lint and search; shared by the CLI and the viewer |
-| `src/stats.js` | reads the agents' session records |
+| `src/sessions.js` | finds the record an agent keeps of a session |
+| `src/stats.js` | reduces a session record to cost per agent |
+| `src/doctor.js` | reduces a session record to what the session started with |
 | `src/cli.js` | the commands |
 | `src/viewer.html` | the viewer |
 

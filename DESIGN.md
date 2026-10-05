@@ -89,23 +89,55 @@ What it shows:
 
 - The main session averaged 104k per step, against 284k before, and never came near the old contexts.
 - The cost moved into the implementer: more than half of the tokens sent. Its context grew fourfold, partly because the fix rounds continued the same agent, which keeps what it has read. Sending a fix to a fresh implementer would start small but read the code again; which is cheaper has not been measured.
-- Every agent starts at 59k to 79k before it reads anything: the project's rules, plugins and tool definitions. That is outside Superwiki and is paid on every step of every agent.
+- Every agent starts at 59k to 79k before it reads anything. That start is the subject of the next section.
 
 This is not the same task run both ways, so it shows direction and not a ratio.
 
-## Session statistics
+### What every agent starts with
 
-The measurements above were first made by hand, from the session records the tools keep. `sw.mjs stats` (`src/stats.js`) is that measurement as a command, so every project can see where its tokens go. It finds the project's session, reduces the record to one row per agent (the main session and each subagent) and prints steps, the context of the first and the largest request, tokens sent in total, the cached share, output, tool calls and minutes. `sw-stats` shows the table and `sw-implement` closes its report with it.
+A session's start is sent again with every step of every agent, so in the run above it was roughly eight of the twenty-one million tokens sent. Almost none of it was Superwiki's: the vault adds a 1.7 KB block of rules. The tool's own count for the main session, in tokens:
 
-It writes nothing: the numbers describe a session, not the project.
+| Part | Tokens | What it was |
+| --- | --- | --- |
+| Rule and memory files | 16.8k | the project's rules (12 KB) and a memory index of 67 entries (20 KB) |
+| Built-in tool definitions | 15.1k | the tool's own |
+| Skill list | 9.9k | 213 skills, most from plugins for advertising, SEO and marketing |
+| Agent list | 4.0k | 46 agents, most from the same plugins |
+| System prompt and MCP server instructions | 6.1k | |
+
+The definitions of MCP tools were not in it: 370k tokens of them were loaded on demand, and only their names were sent.
+
+So the start is the user's environment, and part of it can be switched off per project without losing anything the project uses. That is a job for a command, not for advice in a README: see `sw-doctor` below.
+
+The first attempt on that project, measured with the tool's own count in a new session, took the start from 52k to 41.5k tokens:
+
+| Change | Result |
+| --- | --- |
+| Memory index rewritten to one lesson per line, 20 KB to 9 KB | rule and memory files 16.8k to 10.7k |
+| Four unused plugins switched off in the project's local settings | agent list 4.0k to 1.6k. Built-in tool definitions also fell, 15.1k to 12.6k; why is not established |
+| The same four plugins, for the skill list | no change, 9.9k: the tool gives the list a fixed budget and shortens descriptions to fit, so the remaining skills got fuller descriptions instead |
+| An environment variable in the project's settings to drop the account's connectors | no effect; the connectors were still listed |
+
+Two lessons went into the skill: a change is measured in a new session before it is called a saving, and fewer skills buys better descriptions, not fewer tokens.
+
+## Reading the session record
+
+The measurements above were first made by hand, from the session records the tools keep. Two commands now make them for any project. Neither writes anything: the numbers describe a session, not the project.
 
 | Tool | Record | What it holds |
 | --- | --- | --- |
-| Claude Code | `~/.claude/projects/<project>/<session>.jsonl`, subagents in a folder beside it | usage per request |
-| Codex | `~/.codex/sessions/<date>/rollout-*.jsonl`, one file per agent, joined by session id | usage per request |
-| Copilot CLI | `~/.copilot/session-state/<session>/events.jsonl` | totals per agent, written when the session closes; steps and tool calls before that |
+| Claude Code | `~/.claude/projects/<project>/<session>.jsonl`, subagents in a folder beside it | usage per request; one block per piece of context the session was given |
+| Codex | `~/.codex/sessions/<date>/rollout-*.jsonl`, one file per agent, joined by session id | usage per request; base instructions and the tagged blocks sent before the first request |
+| Copilot CLI | `~/.copilot/session-state/<session>/events.jsonl` | totals per agent, written when the session closes; the system message; tool definitions counted at a usage checkpoint |
 
-The session reported is the one the command runs in where the tool names it (Claude Code sets its id in the environment), otherwise the project's most recently written one. These formats are not documented by their vendors and can change with a release; the command then reports less, and the tests pin the shapes it reads.
+`src/sessions.js` finds the record: the session a command runs in where the tool names it (Claude Code sets its id in the environment), otherwise the project's most recently written one.
+
+- **`sw.mjs stats`** (`src/stats.js`, skill `sw-stats`) reduces the record to one row per agent, the main session and each subagent: steps, the context of the first and the largest request, tokens sent in total, the cached share, output, tool calls and minutes. `sw-implement` closes its report with it.
+- **`sw.mjs doctor`** (`src/doctor.js`, skill `sw-doctor`) reduces it to what the session started with: each part with its size and where it comes from, files by name, skills and agents by plugin, tools by server. The skill proposes what to switch off, asks, and changes project-local settings only.
+
+A skill cannot run a tool's own context command, which is typed by the user. `doctor` therefore reports characters of text, read from the record; the tool's command shows the same parts in tokens, and the skill uses those figures when the user pastes them.
+
+These formats are not documented by their vendors and can change with a release. The commands then report less; the tests pin the shapes they read.
 
 ## Skills
 
@@ -121,6 +153,7 @@ The session reported is the one the command runs in where the tool names it (Cla
 | `sw-lint` | script checks first; semantic review as a separate, approved pass |
 | `sw-visualize` | open the viewer |
 | `sw-stats` | what the current session has cost, per agent; prints, writes nothing |
+| `sw-doctor` | what a session starts with and what to switch off; changes project-local settings only, after asking |
 | `sw-config` | areas, and the model each tool uses for planning, implementing and reviewing |
 
 The schema block in `AGENTS.md` holds the rules that must apply without any command: read the index first, keep task status and the log current, log work that belongs to no task. It also tells the agent which skill to reach for without being asked, ahead of other planning or debugging skills; a skill's description alone proved too weak a trigger when another skill set competes for the same words.
@@ -133,9 +166,9 @@ No tool lets a skill change the running session's model, and only Claude Code le
 
 ## Viewer and CLI
 
-`src/core.js` holds the vault model, derived task state, lint and search. It is bundled into `docs/.sw/sw.mjs` for Node, together with the session statistics and the commands, and inlined into `docs/viewer.html` for the browser, so both report the same findings.
+`src/core.js` holds the vault model, derived task state, lint and search. It is bundled into `docs/.sw/sw.mjs` for Node, together with the session readers and the commands, and inlined into `docs/viewer.html` for the browser, so both report the same findings.
 
-`sw-init` copies the CLI and the viewer into the project, so skills call `node docs/.sw/sw.mjs` the same way in every agent, and a project keeps working with the version it was set up with.
+`sw-init` copies the CLI and the viewer into the project, so skills call `node docs/.sw/sw.mjs` the same way in every agent, and a project keeps working with the version it was set up with. The price: after Superwiki is updated, a project has the old script until `sw-init` runs there again. A skill that needs a command the script lacks says so and offers to run it.
 
 `sw-visualize` runs `sw.mjs serve --open`: a small server on 127.0.0.1, started once per project, reused, and gone after two idle hours. It serves the viewer and the vault's pages, read from disk on every Refresh, so the user picks nothing and any browser works. Without the server, `sw.mjs snapshot` writes the pages to `docs/.sw/data.js` and the viewer opens as a file, frozen at that moment. `data.js` and the server's address file are git-ignored.
 
@@ -149,14 +182,15 @@ A mapping can keep any column as a frontmatter field (a review class becomes `re
 
 | Part | Evidence |
 | --- | --- |
-| Core, CLI, installer, session statistics | unit tests (`npm test`) |
+| Core, CLI, installer, session readers | unit tests (`npm test`) |
 | Viewer | headless Chromium on the demo vault and on a migrated 165-task project |
 | `sw-init` | followed by a fresh agent on a scratch project |
 | `sw-migrate` | an earlier version followed twice by a fresh agent on a 165-task project; an independent parse of the source confirmed every field of every task, all detail text and zero broken links. The current version converted a second, 48-task project in place: counts matched the old tables and lint found nothing. That run was made by the session that wrote the skill, not by a fresh agent |
 | `sw-ingest`, `sw-lint`, `sw-explain`, `sw-triage` | followed once by a fresh agent on a copy of the demo vault, then revised |
 | `sw-implement` without a plan | run three times on real tasks with the implementer on a cheaper model; code, tests and repository checks passed each time, the visual checks were not allowed to run |
-| `sw-plan`, `sw-implement` and the review, current versions | run end to end once in Claude Code on a real task that required a review. The generated `sw-planner`, `sw-implementer` and `sw-reviewer` agents were dispatched by name on their configured models; the reviewer returned one blocking finding, the implementer fixed it, the second review passed. The resulting code was not judged independently |
-| `sw.mjs stats` | run on real session records: Claude Code 2.1 (the task above, three subagents), Codex CLI 0.153 and Copilot CLI 1.0.91 (one short session each, with one subagent). The Copilot totals match the tool's own closing record |
+| `sw-plan`, `sw-implement` and the review, current versions | run end to end once in Claude Code on a real task that required a review. The generated `sw-planner`, `sw-implementer` and `sw-reviewer` agents were dispatched by name on their configured models; the reviewer returned one blocking finding, the implementer fixed it, the second review passed. A later reading of the code and a run of the project's checks found the work sound |
+| `sw.mjs stats`, `sw-stats` | run on real session records: Claude Code 2.1 (the task above, three subagents), Codex CLI 0.153 and Copilot CLI 1.0.91 (one short session each, with one subagent). The Copilot totals match the tool's own closing record. The skill was followed in Claude Code, including the case of a project whose script was too old |
+| `sw.mjs doctor` | run on the same three records. For Claude Code the parts agree with the categories of the tool's `/context`; the Codex and Copilot output has not been compared with those tools' own commands |
 | Codex CLI 0.153, Copilot CLI 1.0.31 | skills found; a blocked task refused; `sw-plan` run with the generated planner agent, earlier skill version |
 
 ## Open questions
@@ -164,12 +198,14 @@ A mapping can keep any column as a frontmatter field (a review class becomes `re
 - Whether the cost rules hold on projects unlike the two they were measured on.
 - Whether running the work in subagents saves what the measurements suggest, on one task run both ways.
 - Whether a fix after a review is cheaper in the implementer that did the work or in a fresh one.
+- How to switch an account's connectors off for one project from a file: only the tool's own `/mcp` panel is known to do it, and its effect on the start has not been measured.
+- Whether listing tools in a generated agent file (`tools:`) keeps a subagent from carrying the skill and tool lists.
 - Whether the schema block makes agents reach for the skills unprompted.
 - Whether a reviewer told not to edit the repository always complies: its instructions forbid it, its permissions do not.
 - Claude Code: presenting a plan through plan mode has not been tried.
 - Codex and Copilot CLI: `sw-implement`, the review and the current `sw-plan` have not been run there.
 - Copilot CLI: whether the `model:` field of a generated agent file is honoured.
-- `sw.mjs stats`: a Copilot session that was resumed closes more than once, and the command adds the closing records up; whether each one covers only its own run has not been checked. Codex and Copilot sessions longer than a few steps have not been read.
-- `sw-visualize` and `sw-stats` skill texts have not been followed by an agent.
+- Session records: a Copilot session that was resumed closes more than once, and `stats` adds the closing records up; whether each one covers only its own run has not been checked. Codex and Copilot sessions longer than a few steps have not been read.
+- `sw-visualize` and `sw-doctor` skill texts have not been followed by an agent.
 - Plugin manifests (`.claude-plugin`, `.codex-plugin`) validate but have not been installed.
 - Migration leaves links in files outside `docs/` (for example `architecture.md`) pointing at archived files.

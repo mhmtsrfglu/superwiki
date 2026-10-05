@@ -47,6 +47,7 @@ test('schema block with tasks: wiki, task and skill rules, no template markers',
   assert.match(agents, /run `node docs\/\.sw\/sw\.mjs board`\. Never edit that list by hand/);
   assert.match(agents, /Work that belongs to no task .* one `change` entry/);
   assert.match(agents, /Implementing a task: `sw-implement`/);
+  assert.match(agents, /One task from start to done in one command \(it decides whether a plan is needed\): `sw-do`\./);
   assert.match(agents, /`sw-triage` first/);
 });
 
@@ -57,7 +58,7 @@ test('wiki-only vault leaves the task module out', () => {
   assert.ok(!existsSync(join(root, 'docs/.sw/templates/task.md')));
   assert.doesNotMatch(read(root, 'docs/index.md'), /sw:board|## Tasks/);
   const agents = read(root, 'AGENTS.md');
-  assert.doesNotMatch(agents, /tasks\/<ID>|Tasks:|sw-plan|sw-implement|sw-explain|board/);
+  assert.doesNotMatch(agents, /tasks\/<ID>|Tasks:|sw-plan|sw-implement|sw-do|sw-explain|board/);
   assert.match(agents, /`docs\/index\.md`: catalog, one line per wiki page/);
   assert.match(agents, /sw\.mjs search/);
   assert.match(agents, /`sw-ingest`/);

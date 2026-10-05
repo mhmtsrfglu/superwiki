@@ -193,6 +193,7 @@ A project's `docs/` folder is plain markdown and keeps working as an Obsidian va
 | `sw-init` | set up `docs/` in the current project, or upgrade it |
 | `sw-migrate` | convert an existing table-based task index, on a git branch of its own |
 | `sw-ingest` | file a source into the wiki |
+| `sw-do` | take one task from todo to done: judge its size, plan it if it is large (you approve the plan), implement, summarize |
 | `sw-plan` | plan a task with the planner subagent and get your approval |
 | `sw-implement` | run a task with the implementer subagent, have it reviewed if the task asks for that, summarize it with evidence, and record the result |
 | `sw-summarize` | close a task with a `## Summary` in its file: plan, implementation, changed files from git, and a freshly run command for each "Done when" item. A task is `done` only when every item is verified |
@@ -213,6 +214,10 @@ Shown as typed in Claude Code. In Codex, write `$sw-plan` instead of `/sw-plan`.
 ```text
 /sw-init                          set up the vault; asks whether you want tasks
 /sw-migrate                       convert the task tables this project already has
+
+/sw-do P-15                       take P-15 from todo to done: straight to work if it is small,
+                                  a short note first if medium, a plan you approve if large
+/sw-do                            what can start now? pick one and do it
 
 /sw-plan                          what can start now? pick one and plan it
 /sw-plan P-15                     plan task P-15 (a small task is sent straight to sw-implement)

@@ -44,6 +44,7 @@ Skills. Use these without being asked. For work in this vault they come before a
 {{#tasks}}
 - Planning a task, or the user asks what to work on next: `sw-plan`.
 - Implementing a task: `sw-implement`. A change that needs no plan and touches one or two files may be done directly, under the task rules above.
+- One task from start to done in one command (it decides whether a plan is needed): `sw-do`.
 - Closing a task, or the user asks what a task did and how it was verified: `sw-summarize`.
 - Several tasks in a row without the user at each step: `sw-run`.
 - A question about a task (what, why, what it blocks): `sw-explain`.

@@ -73,6 +73,7 @@ Measured on a large monorepo with small panel tasks, the planner on one model an
 | Implementer only, with the reading rules | about 115k |
 
 - **Small tasks skip planning.** One area, three "Done when" items or fewer, nothing left open, a few files: `sw-implement` runs straight from the task file. This was the largest saving. Its price: questions a planner would have put to the user are decided by the implementer and reported afterwards.
+- **Three routes.** `sw-do` sorts a task from its task file alone and runs the chain. Small is the rule above. Large is any of: more than six "Done when" items, more than one area, an open question, a required review, or a new format, interface or migration other work will depend on; it gets a plan and the user's approval. Everything between is medium and gets an "Approach" note of three to five lines in the task's "Notes". The reasoning is cost: a note costs the orchestrating session a few lines, a plan costs a planner run that reads the code. The note is written without reading code, so it orders the work and names the checks but settles no technical question.
 - **Reading follows rules.** Locate before opening, open the range and not the file, one example per pattern, trust generated types, batch lookups, never read twice. On the same task from the same starting point this cut context by about a fifth and tool calls by a third.
 - **The task text decides the work.** In the measured run the cheaper implementation left out one of the states the task listed. The implementer therefore lists every requirement the task states and marks each `met`, `not met` or `differs`; `sw-implement` treats a missing or differing item as not done until the user accepts it.
 - **The plan does not pass through the main session.** The planner writes the plan file as `status: draft` and returns a few lines; approval changes it to `approved`. The main session reads neither the code nor the plan.
@@ -179,6 +180,7 @@ These formats are not documented by their vendors and can change with a release.
 | `sw-init` | scaffold the vault, the viewer and the schema block |
 | `sw-migrate` | convert a table-based task index, on a git branch of its own |
 | `sw-ingest` | turn a raw source into wiki pages |
+| `sw-do` | take one task from todo to done: classify it as small, medium or large from the task file, then follow `sw-plan` and/or `sw-implement` |
 | `sw-plan` | decide whether a plan is needed; have the planner subagent write it; get approval |
 | `sw-implement` | run a task with the implementer subagent, check every requirement, have it reviewed where the task asks for that, summarize it, record the result |
 | `sw-summarize` | the gate before `done`: write the task's `## Summary`, with changed files from git and a freshly run command for each "Done when" item |
@@ -249,7 +251,7 @@ A mapping can keep any column as a frontmatter field (a review class becomes `re
 - Codex and Copilot CLI: `sw-implement`, the review and the current `sw-plan` have not been run there.
 - Copilot CLI: whether the `model:` field of a generated agent file is honoured.
 - Session records: a Copilot session that was resumed closes more than once, and `stats` adds the closing records up; whether each one covers only its own run has not been checked. Codex and Copilot sessions longer than a few steps have not been read.
-- `sw-visualize`, `sw-doctor`, `sw-run`, `sw-board` and `sw-summarize` skill texts have not been followed by an agent.
+- `sw-visualize`, `sw-doctor`, `sw-run`, `sw-board`, `sw-summarize` and `sw-do` skill texts have not been followed by an agent.
 - The summary in the viewer's task drawer has not been looked at in a browser; its parsing is unit-tested.
 - Plugin manifests (`.claude-plugin`, `.codex-plugin`) validate but have not been installed.
 - Migration leaves links in files outside `docs/` (for example `architecture.md`) pointing at archived files.

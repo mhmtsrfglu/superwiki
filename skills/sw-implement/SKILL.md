@@ -22,7 +22,7 @@ Run commands from the project root. `<skill-dir>` is the directory this SKILL.md
    | `can start: n/a, status is in-progress` | this is a continuation; skip step 3 |
    | `can start: n/a, status is done` or `cancelled` | stop and ask what the user wants |
    | `plan: ... (draft, not approved)` | stop; the plan needs the user's approval (sw-plan) |
-   | `plan: none` | fine for a small task: one area, three "Done when" items or fewer, nothing open in its notes, a few files. For anything larger, recommend sw-plan first and let the user choose |
+   | `plan: none` | fine for a small task: one area, three "Done when" items or fewer, nothing open in its notes, a few files. Also fine when the task's "Notes" hold an `Approach (sw-do, ...)` note: sw-do chose the medium route. For anything else, recommend sw-plan first and let the user choose |
    | `review: required (...)` | remember it for step 7 |
    | `can finish: no` and `summary: none` | expected before the work: the summary is written in step 8 |
 

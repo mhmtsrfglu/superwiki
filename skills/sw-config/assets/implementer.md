@@ -26,7 +26,7 @@ A task rarely needs more than a dozen files opened besides the ones it changes. 
 
 ## Work
 
-1. Do the work. Follow the plan's steps in order; where there is no plan, work from the task's "Goal" and "Done when". Follow the repository's own rules.
+1. Do the work. Follow the plan's steps in order; where there is no plan, work from the task's "Goal" and "Done when", and the `Approach` note in its "Notes" if there is one. Follow the repository's own rules.
 2. Build every requirement on your list. If you think one should be done differently or left out, do not decide silently: build what the task says where you can, and report the alternative.
 3. Verify. After a step, run the narrowest check that covers it. Run the full verification list once, at the end, after the last edit.
    - A check marked `needs: ...` in the plan runs only if your input says it may. Otherwise report it as not verified, with what it needs.

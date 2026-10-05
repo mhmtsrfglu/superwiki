@@ -5,83 +5,97 @@ description: Use when the user wants several Superwiki tasks worked through one 
 
 # sw-run
 
-Works through tasks in order, unattended: for each one, plan it if it needs a plan, implement it, have it reviewed if it requires that, summarize it with evidence, record it, and go on to the next. You are the orchestrator. Every piece of work goes to a subagent with a clean context; your session holds only the queue, the reports and the decisions.
-
-Each task is run exactly as sw-implement runs it. This skill adds what a run of many needs: answers agreed once at the start, decisions you make in the user's place and write down, and rules for when to stop.
+Works through tasks in order, unattended, each one as the single-task skills run it. You are the orchestrator: subagents with clean contexts do the work; your session holds the queue, the reports and the decisions.
 
 Run commands from the project root.
 
+## The skills a run follows
+
+Load each once and follow it for every task:
+
+- **sw-do**: step 1's `check` table, steps 2 and 3 (the rubric, the `Route:` line) and step 4's medium route (the Approach note);
+- **sw-plan**: steps 4 to 6 and "An agreed split", on the large route;
+- **sw-implement**: steps 2 to 10 and "Dispatching";
+- **sw-summarize**: all of it, as sw-implement step 8 calls it.
+
+This skill takes the place of their other steps.
+
 ## Before the first task
 
-1. **Scope.** Which tasks: an area, a list of ids, or everything that becomes ready. Take it from the user's message. Default order is the order of `node docs/.sw/sw.mjs ready`.
-2. **Standing answers.** The user will not be asked again, so these are settled now. Ask only for the ones their message leaves open, in one question:
+1. **Scope**, from the user's message: an area, a list of ids, or everything that becomes ready. An area is a task id prefix; `areas` in `docs/.sw/config.json` maps each prefix to its name, so "the backend area" is the prefix named Backend. Its tasks are the ids with that prefix that `node docs/.sw/sw.mjs ready` lists at the start, in its order; tasks that become ready later join only when the message asks for them. No prefix matches: ask, or, when questions are ruled out, stop and say so.
+2. **Standing answers**, settled now, since the user will not be asked again:
 
-   | Question | If the user does not say |
+   | Question | If the message does not answer it |
    | --- | --- |
-   | May plans be approved without them? | yes; that is what unattended means |
-   | Which `needs:` checks (starting services, changing data) may run? | none |
+   | May plans and proposed splits be approved without them? | yes |
+   | Which checks that start a service, need a running stack or change data may run? | none |
    | Commit after each task? Push? | no commit, no push |
    | Go on with other tasks when one stops? | no; stop the run |
 
+   A question is answered only where the message speaks to it: "finish them all" sets the scope and "don't ask me" rules out questions, and neither answers one; "don't commit" answers commit, not push. Ask for the open ones in one question. When the message rules out questions, ask nothing: write one line that starts `Standing answers:` and gives all four, the user's where given and the default otherwise, and start.
 3. **Check that the run can do what was agreed**, before any task is touched:
    - `node docs/.sw/sw.mjs lint`: errors are fixed or reported first.
-   - Commits were agreed: run one harmless git command. If the project's settings or the tool refuse git, say so now. Do not start a run whose terms cannot be met, and do not look for another way to run the refused command.
-   - The working tree holds changes that belong to no task of this run: say what they are and ask once whether to leave them or commit them first.
-4. **A clean session per task.** You cannot open a new session; a fresh subagent per role is the clean context. If the user asked for sessions, say this is how it is done.
+   - Commits were agreed: run one harmless git command. Refused by the project's settings or the tool: say so now, and neither start the run nor look for another way to run the command.
+   - Changes in the working tree that belong to no task of this run: say what they are and ask once whether to leave them or commit them first. Questions ruled out: leave them.
 
 ## Each task
 
-1. **Next task**: `node docs/.sw/sw.mjs ready`. A task in progress comes first, then the first ready task in scope. None left: go to "The report".
-2. **Run it as sw-implement does**: gate, mark it started, checks that need the environment, implementer, judge the report, review if required, summarize (sw-summarize, a command run for every "Done when" item), record, task list. Load sw-implement and sw-summarize once and follow it for every task. What differs in a run:
+1. **Next task**: `node docs/.sw/sw.mjs ready`. A task in scope that is in progress comes first, then the first ready one in scope. None left: go to "The report".
+2. **Gate**: sw-implement step 2, with sw-do's `check` table. A task whose plan is approved goes to step 5; one already in progress skips step 3.
+3. **Mark it started** (sw-implement step 3), before routing.
+4. **Route it** with sw-do's rubric, from the task file alone, and say its `Route:` line, as sw-do step 3 does. A draft plan means large.
+   - Small: step 5.
+   - Medium: the `Approach (sw-do, <date>):` note into "Notes", as sw-do writes it, unless one is there; then step 5.
+   - Large: sw-plan steps 4 to 6; step 6 runs whole, so the plan is `approved`.
+5. **Implement**: sw-implement steps 4 to 10, with the differences below. Step 10 keeps the area guide for every task.
+6. **Close the task**, also one that stops the run:
+   - `node docs/.sw/sw.mjs lint`. An error stops the run.
+   - Commit, if agreed and the task is `done`: the files under its Summary's `### Changes` plus its bookkeeping (task file, plan, `docs/log.md`, `docs/index.md`, the area guide if changed), message `<ID>: <title>`. Push only if agreed. A refused commit or push stops the run.
+7. **Check your own size**: `node docs/.sw/sw.mjs stats`, row `main`. A `peak` above 200k tokens stops the run here, between tasks.
 
-   | In sw-implement or sw-plan | In a run |
-   | --- | --- |
-   | a task that is not small: "recommend sw-plan and let the user choose" | plan it. Mark the task started first, then dispatch the planner as sw-plan step 4 says |
-   | the planner's `Questions` go to the user | answer each with the planner's assumed answer, unless the task file, a wiki page or a recorded lesson says otherwise (`node docs/.sw/sw.mjs search <words>`). Write every answer into the task's "Notes" as `decided without the user: ...` |
-   | the plan waits for approval | approve it, if that was agreed, with a log entry that says it was approved under the run's standing answer |
-   | a `differs` item is the user's call | send it back to the implementer once with the task's wording. Still differs: stop |
-   | offers after a task (wiki pages, lessons, follow-up tasks) | do not ask and do not act. List them in the report |
+### What differs in a run
 
-3. **Close the task.** Commit, if agreed: only the files this task changed, message `<ID>: <title>`. Push only if agreed. A refused commit or push stops the run.
-4. **Check your own size**: `node docs/.sw/sw.mjs stats`, row `main`. If its `peak` is above 200k tokens, stop here, between tasks: every further step would pay for all of it. Tell the user to start a new session and run sw-run again; the queue is in the files, so nothing is lost.
+| In the single-task skills | In a run |
+| --- | --- |
+| sw-implement step 2: a draft plan stops; a task that is not small and has no plan goes to the user | step 4's route decides |
+| sw-plan step 5: the user sees the plan, answers its questions, approves it and any split | nothing is presented. Each question gets the assumed answer, unless the task file, a wiki page or a lesson says otherwise (`sw.mjs search`); the plan and any split are approved under the standing answer. A split's new task joins the queue only if it is in scope |
+| sw-plan step 6: the answers go into "Notes"; the `plan` log entry | the answers go into "Notes" once, as decisions made without the user; the log entry gets the body line `Approved under the run's standing answer.` |
+| sw-implement steps 4 and 6: the user allows checks that need the environment | the standing answer, no question: unattended means fewer questions, not more permission |
+| sw-implement step 6: a `differs` item is the user's call | one fix round, its entry the item in the task's wording |
+| sw-implement steps 11 and 12: offers, and the report | offers, open decisions and open findings go into the run's report; the rest is in each task's Summary |
+
+### Decisions made without the user
+
+Every answer you give in the user's place, recorded where it was made:
+
+- on a task (a planner question answered, a plan or split approved, a `differs` item sent back): in its "Notes" as `- <date>, decided without the user: ...`, and in the report with its id;
+- for the run (each default in the `Standing answers:` line, working-tree changes left alone): in the report under `run` and nowhere else, even when it later decides something on a task, as a check not allowed does.
 
 ## When to stop
 
-Stop the run, leave the task `in-progress` with what is open in its "Notes", and report. Do not skip the task and take the next one unless that was agreed and the next task does not depend on it.
+A stop on a task fires once the task is closed (step 6), with its summary and outcome recorded; a summary with an `unverified` or `failed` item takes step 9's `blocked: <n> unverified, <m> failed` row. Then stop and report, also on the last task in scope. Take the next task instead only if agreed and independent of this one.
 
-- A requirement is `not met` or still `differs` after one more round with the implementer.
-- The review still says `changes needed` after two rounds.
-- The summary leaves an item unverified or failed.
-- The task cannot be verified without a `needs:` check that was not allowed.
-- A commit or push that was agreed is refused.
-- `lint` reports an error after the task was recorded.
-- Your `peak` is above 200k (this one is between tasks, with nothing left open).
+- A requirement is `not met`, or a fix round reports an entry `not fixed`. A `differs` item not fixed is a difference the user has not decided: `unverified` in the summary.
+- The review after the second fix round still says `changes needed`.
+- The summary leaves an item `failed` or `unverified`, also one whose check was not allowed: that stop too fires after the summary, never before the work, with the task built and reviewed where required.
+- `lint` reports an error, or an agreed commit or push is refused.
+- A large task, when plans may not be approved without the user: stop before its planner.
+- Your `peak` is above 200k.
 
 ## Keeping the run cheap
 
-A run pays for the orchestrator's context once per step, for every task. What keeps it small:
-
-- **A fresh subagent for every task and every role.** Never continue the agent that planned or implemented the previous task.
-- **Prompts as the role files ask**: task id, date, project root, the checks it may run, the standing answers that concern it. No reading lists and no project summary; each role knows what to read.
-- **Reports, not files.** Do not read code, plans or the other tasks' files. `ready`, `check` and `explain` answer what you need about the queue.
-- **One load of each skill.** Do not load a skill again to re-read it.
-- **Edit frontmatter with your edit tool**, not with `sed` or another text substitution: a pattern that does not match fails silently and the status is then wrong without an error.
+- **A fresh subagent for every task and role**, as the clean session a skill cannot open. Only a fix round continues one: the implementer of the same task.
+- **Prompts exactly as sw-plan step 4 and sw-implement's "Dispatching" give them.** No reading lists, no project summary, no word on commits: the role files say changes stay uncommitted and committing is yours.
+- **Reports, not files.** You read no code and no other task's files. Of a plan you read what sw-summarize reads, `## Approach` and `## Verification`, and its frontmatter when sw-plan step 6 approves it.
+- **Edit frontmatter with your edit tool**: a `sed` pattern that does not match fails silently.
 
 ## The report
 
-At the end, or when the run stops:
+At the end or on a stop:
 
-1. A table: task, outcome, review verdict, commit.
-2. **Decisions made without the user**, one line each with the task id. This is the list the user must read.
-3. What stopped the run, if it stopped, and what would let it continue.
-4. Offers and open findings collected along the way.
+1. A table, one row per task in scope (`not reached` for the rest): task, route, outcome, the last review verdict with the number of reviews, commit; `-` where none.
+2. **Decisions made without the user**, one line each with the task id, or `run`.
+3. What stopped the run, and what would let it continue: for a difference, the user's call on it, applied as sw-implement step 6 says; for a check not allowed, the user's yes; for a failed review, its blocking findings.
+4. Offers, open decisions, and every review's `important` and `minor` findings.
 5. `node docs/.sw/sw.mjs stats`, as printed.
 6. What is ready next.
-
-## Common mistakes
-
-- Asking the user mid-run something the standing answers cover, or not asking at the start something they do not.
-- Deciding a `needs:` check may run because the run is unattended. Unattended means fewer questions, not more permission.
-- Piling several tasks into one uncommitted tree after a commit was refused.
-- Running one long subagent that plans, implements and reviews a task. Measured on a real project, such an agent reached a context of almost a million tokens and sent over ten times what the three separate roles sent on another task of the same project.
-- Carrying on past 200k because the next task looks small.

@@ -21,7 +21,7 @@ Run commands from the project root.
    - work already committed: `git log --name-status --format='%h %s' --grep='^<ID>:'`, the commits whose message starts with `<ID>:`;
    - the short HEAD for the source line: `git rev-parse --short HEAD`.
 
-   List only the files that belong to this task. No git repository, or the vault is ignored by git: say so in the section instead of listing files from recollection.
+   List the files that belong to this task, without its bookkeeping (the task file, its plan, `docs/log.md`, `docs/index.md`, the area guide). Uncommitted work can sit next to other tasks' changes, so a file belongs to the task when it is both in `git status --porcelain` and in the "files changed" of this task's implementer reports, the first report and each fix round's. A session that ran several tasks holds other tasks' reports too; they do not count. Invoked by hand with no report in this session: the whole list, when the tree holds nothing else; otherwise ask the user which files belong to the task. No git repository, or the vault is ignored by git: say so in the section instead of listing files from recollection.
 3. **Pick one command per "Done when" item.**
 
    | Where the command comes from | When |
@@ -37,7 +37,7 @@ Run commands from the project root.
    | --- | --- |
    | the command ran in this session, exited as expected, and its output shows the item | `verified` |
    | the command ran and shows the item does not hold | `failed` |
-   | no command was run: a check that needs the environment and was not allowed, nothing that can prove it, or only someone's word | `unverified`, with the reason |
+   | no command was run: a check that needs the environment and was not allowed, a difference from the item's wording that the user has not decided (run no command for it), nothing that can prove it, or only someone's word | `unverified`, with the reason |
    | the command proves part of the item | `unverified`, saying which part is open |
 
 5. **Write the section** in the format below. It is the last section of the file. If the file already has a `## Summary`, replace it whole; every verdict in the new one comes from this session. Leave the frontmatter and the other sections as they are.
@@ -47,12 +47,12 @@ Run commands from the project root.
 
    | Invoked | Do |
    | --- | --- |
-   | from sw-implement | return to its next step; it records the outcome |
+   | from sw-implement | return to its next step; it records the outcome, and its report shows the summary, so step 9 is skipped |
    | by hand, and every item is verified, `check` says `can finish: yes`, and the task's `review:` is empty | set `status: done` and `finished:` today, append `## [date] task \| <ID> done` to the log, run `node docs/.sw/sw.mjs board` |
    | by hand, and the task requires a review | write the summary only; the status stays. Say that sw-implement runs the review |
    | by hand, and an item is unverified or failed | the status stays. Say what each open item needs |
 
-9. **Report**: show the user the summary itself, not only its counts. In this order: what was planned, what was built and each deviation, the files changed, the verdict for each item with its command, and whether the task can be closed. Say it in the language of the conversation; the section in the file stays as written.
+9. **Report**, when invoked by hand: show the user the summary itself, not only its counts. In this order: what was planned, what was built and each deviation, the files changed, the verdict for each item with its command, and whether the task can be closed. Say it in the language of the conversation; the section in the file stays as written.
 
 ## The section
 
@@ -65,12 +65,12 @@ Summarized <date>: <verified> of <items> verified.
 <the approach as planned, two to four lines>
 
 ### Implementation
-<what was built; each deviation from the plan, or "No deviations.">
+<what was built; each deviation from the plan, or from the task's wording when there was no plan; or "No deviations.">
 
 ### Changes
 - `path` (added | modified | deleted | renamed)
 
-Source: `git status --porcelain` at <short HEAD>.
+Source: `git status --porcelain` at <short HEAD>, matched against the implementer's reports.
 
 ### Verification
 1. **verified**: <"Done when" item 1>
@@ -84,9 +84,10 @@ Source: `git status --porcelain` at <short HEAD>.
 ```
 
 - The four parts are always there, in this order.
-- A task that had no plan: the Plan part reads `No plan: implemented directly from the task.`
+- A task that had no plan: the Plan part reads `No plan: implemented directly from the task.`, followed, when sw-do wrote an Approach note in "Notes", by that note in one or two lines.
+- An item rewritten after an accepted difference is a deviation, with or without a plan: name it under Implementation with its old wording, from the `- Changed <date>` line in the task's "Notes".
 - "Verification" is a numbered list with one entry per "Done when" item, numbered as the items are. Each entry starts with the verdict in bold: `verified`, `unverified` or `failed`. `check`, `lint` and the viewer read exactly that; an item without an entry counts as unverified.
-- Changes taken from commits: name the commits in the source line instead of `git status --porcelain`.
+- The source line says how the files were picked. Changes taken from commits: name the commits instead of `git status --porcelain`. Picked without reports: `the whole tree` or `chosen by the user` in place of `matched against the implementer's reports`.
 - Keep the plan and implementation parts short. The section is a record, not a retelling of the log.
 
 ## Common mistakes

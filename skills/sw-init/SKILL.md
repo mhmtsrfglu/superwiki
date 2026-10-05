@@ -16,12 +16,14 @@ The vault is always `<project root>/docs`. Run every command below from the proj
 3. **Ask the user, in one message** (new vault only):
    - Task module on or off. Recommend on when the project is mainly code, off for a pure knowledge base.
    - If on, the area prefixes for task ids (`M-01`, `B-01`). Recommend the single default area `T` unless the project already has separately named parts. Area names are optional labels; do not ask for them separately.
-4. **Run the script**, with the flags that match the answer:
+   - Whether the Superwiki skills should also be kept in the repository, and for which agents: Claude Code (`.claude/skills`), Codex and Copilot (`.agents/skills`). Recommend yes when cloud agents will work on the repository (Claude Code on the web, Codex cloud, the Copilot coding agent): they start from a clone, see no home folder, and so have only the skills that are committed. Otherwise recommend no. Leave this question out when `<skill-dir>` is inside the project: the skills are in the repository already.
+4. **Run the script**, with the flags that match the answers. `--skills` takes the agents, comma-separated: `claude`, `codex`, `copilot` or `all`. Without it no skills are copied.
 
    ```bash
    node <skill-dir>/scripts/init.mjs --tasks                               # tasks on, default area T
    node <skill-dir>/scripts/init.mjs --tasks --areas "M=Mobile,B=Backend"  # tasks on, named areas
    node <skill-dir>/scripts/init.mjs --no-tasks                            # wiki only
+   node <skill-dir>/scripts/init.mjs --tasks --skills claude,codex         # tasks on, skills in the repository for Claude Code and Codex
    node <skill-dir>/scripts/init.mjs                                       # upgrade
    ```
 
@@ -31,9 +33,12 @@ The vault is always `<project root>/docs`. Run every command below from the proj
    | Status | Say |
    |---|---|
    | `created`, `updated` | what is new or changed |
+   | `created`, `updated` for `.claude/skills/sw-*/` or `.agents/skills/sw-*/` | that the skills are in the repository, in one sentence naming the folder, not one line per skill; and that the folder has to be committed before a clone or a cloud agent has them |
    | `kept`, `unchanged` | that user content and settings were not touched (one sentence, no list) |
+   | `kept ... (not installed by Superwiki)` | that a skill folder of that name was already there and was left as it is; name it. `npx superwiki install --project . --force <targets>` replaces it, if the user wants that |
    | `missing` | that this Superwiki build lacks the file; name it, and do not point the user at it |
    | `note` about `CLAUDE.md` | offer to add the `@AGENTS.md` line. Add it only after the user agrees to that specific change |
+   | `note` "skills in the repository left alone" | that the script ran from the repository's own copy of the skills and so did not update them; give the command from the note |
    | "docs/ already had content" | that content is untouched and outside the vault; sw-migrate converts it |
 
    End with how to look at the result: open `docs/` as an Obsidian vault, or open `docs/viewer.html` in Chrome or Edge and pick the project folder (only if the viewer was not reported `missing`).
@@ -45,7 +50,8 @@ The vault is always `<project root>/docs`. Run every command below from the proj
 | `docs/index.md`, `docs/log.md`, everything in `raw/`, `wiki/`, `tasks/`, `plans/` | kept |
 | `docs/.sw/sw.mjs`, `docs/.sw/templates/`, `docs/viewer.html` | replaced with this version |
 | `AGENTS.md` | only the Superwiki block (from the `sw:start` comment to the `sw:end` comment) is replaced |
-| `docs/.sw/config.json` | areas and models kept unless new flags are passed |
+| `docs/.sw/config.json` | areas, models and the agents whose skills are kept in the repository (`skills`) stay as saved unless new flags are passed |
+| `.claude/skills/sw-*/`, `.agents/skills/sw-*/`, when `skills` names an agent | a folder Superwiki installed is replaced with this version; any other folder of that name is kept. Nothing is deleted, also not after `--no-skills`. Left alone when the script runs from one of these folders |
 
 ## Without Node
 

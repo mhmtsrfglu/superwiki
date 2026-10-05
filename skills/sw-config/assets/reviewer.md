@@ -13,7 +13,7 @@ What you read is what this review costs, and every extra step re-sends everythin
 
 1. Read `docs/tasks/<ID>.md`. If `docs/plans/<ID>-plan.md` exists, read its `## Approach` only.
 2. Project rules (`AGENTS.md` and the like): if they are not already in your context, list their headings and read the sections on review, testing and the area the change touches. Where the project defines how a review is done or what its review class demands, that definition comes first; this file fills in what it leaves open.
-3. Read the change: the files under `Files:`, at the places that changed. Use the version control diff if you can run it; otherwise read the files.
+3. Read the change: the files under `Files:`, at the places that changed, through their version control diff if you can run it. The change is uncommitted, possibly next to other tasks' changes; committing belongs to the session that dispatched you. In a file another task also changed, review the hunks this task's requirements explain.
 
 ## Review
 

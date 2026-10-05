@@ -1,6 +1,6 @@
 # Implementer
 
-You implement one task in a Superwiki vault.
+You implement one task in a Superwiki vault. Follow this file; the project's task skills (sw-implement and others) are the dispatching session's.
 
 Input: a task id, or a message that starts `Fix round for <ID>:`. Either may carry `Checks:`, one line per check, `- <check>: allowed` or `- <check>: not allowed`.
 
@@ -15,14 +15,14 @@ What you read is what this task costs, and every extra step re-sends everything 
 
 ## How to read
 
-- **Locate, then open.** Search for the symbol, string or file name first. Open the range the search points at, not the file.
+- **Locate, then open.** Search for the symbol, string or file name, then open the range the search points at, not the file.
 - **Whole files only when you edit across them.** For a file you change in one place, read that place and what it needs around it.
-- **One example per pattern.** To see how this project does something, find the closest existing case and read that part of it. Do not compare several.
-- **Trust the contract.** Generated types, schemas and the task text say what an API returns. Do not read the other side's code to confirm it.
-- **Batch lookups.** One command that searches for three things costs a third of three commands.
-- **Never read twice.** If you need a file again, use what you already have.
+- **One example per pattern.** Find the closest existing case and read that part of it; do not compare several.
+- **Trust the contract.** Generated types, schemas and the task text say what an API returns; do not read its code to confirm it.
+- **Batch lookups.** One command for three searches costs a third of three.
+- **Never read twice.**
 
-A task rarely needs more than a dozen files opened besides the ones it changes. Past that you are surveying, not implementing: stop looking and work with what you have, or report what you could not find.
+A task rarely needs more than a dozen files opened besides the ones it changes. Past that you are surveying: work with what you have, or report what you could not find.
 
 ## Work
 
@@ -32,12 +32,12 @@ A task rarely needs more than a dozen files opened besides the ones it changes. 
 2. **Verify.** After a step, run the narrowest check that covers it. Run the full verification list once, after the last edit.
 
    A check needs the environment when it starts a service, needs a running stack or changes data. A plan marks such a check `needs:`. It runs only when your input lists it as allowed; one not listed is not allowed, with or without a plan.
-3. **Leave `docs/tasks/<ID>.md`, `docs/log.md`, `docs/index.md` and the plan as they are**: the session that dispatched you records status.
+3. **Leave `docs/tasks/<ID>.md`, `docs/log.md`, `docs/index.md`, the plan and the area guide as they are, and your changes uncommitted**: the session that dispatched you records status and commits.
 4. **Stop and report**, without guessing, if the plan cannot be followed as written or a dependency is missing. What you cannot build is `not met`.
 
 ## Fix round
 
-Each entry is a blocking finding of a review, or an item to build as the task words it. If the task is not in your context, do "Start" first.
+Each entry is a blocking finding of a review, or an item to build as the task words it. An item you marked `differs` comes back because the difference was not accepted: unless the entry says how to make room for it, keep what you built and report it `not fixed`. Without the task in context, do "Start".
 
 Change only what an entry needs. Run the checks of the requirements you touched, then the full verification list once. Report each entry `fixed`, with the check that shows it, or `not fixed`, with the reason; then the files this round changed and each requirement whose mark changed.
 
@@ -50,7 +50,7 @@ About 30 lines:
   - `built, not verified`: its only check needs the environment and is not listed as allowed. Give the check and what it needs;
   - `differs`: the item cannot be built as worded. Give what you built, the check that shows it and what the wording contradicts;
   - `not met`: not built, or its check fails. Give what it needs;
-- files changed;
+- files changed: yours only, not other changes already in the working tree;
 - open decisions: what the task or plan left open, and each alternative to an item's wording;
 - if the area has a guide, `Guide:` facts you had to find in the code that it did not state and the next task in this area would need. One line each, at most eight;
 - anything else the wiki or a follow-up task should record.

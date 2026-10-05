@@ -1,10 +1,12 @@
 #!/usr/bin/env node
-// Installs the Superwiki skills into the folder each coding agent reads.
+// Installs the Superwiki skills into the folder each coding agent reads: in the home folder, for
+// every project on this machine, or in one project, where they are committed with the repository.
 // Run from npm (`npx superwiki install claude`) it copies them; `--link` links them to this
 // checkout instead, which is what install.sh does for a git clone.
 import { existsSync, lstatSync, readlinkSync, realpathSync, mkdirSync, readdirSync, rmSync, cpSync, symlinkSync, writeFileSync, readFileSync, statSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join } from 'node:path';
 import { homedir } from 'node:os';
+import { createInterface } from 'node:readline/promises';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -24,17 +26,23 @@ Targets:
   all        claude + codex + copilot
 
 Options:
-  --project <dir>  install into that project instead of your home folder
-                   (.claude/skills for claude, .agents/skills for the others)
+  --global         use your home folder: the skills serve every project on this machine
+  --project <dir>  use that project instead (.claude/skills for claude, .agents/skills for the
+                   others); committed with the repository, the skills reach cloud agents too
   --link           link the skills to this copy of Superwiki instead of copying them
                    (for a git clone: updating the clone then updates every agent)
   --force          replace or remove a skill folder that Superwiki did not install
   -v, --version    print the version
   -h, --help       show this help
 
+install asks "home folder or this project" when it runs in a terminal and neither --global nor
+--project is given; outside a terminal it uses the home folder. uninstall never asks: it works
+on the home folder unless --project is given.
+
 Examples:
   npx superwiki install claude
   npx superwiki install claude codex
+  npx superwiki install --global all
   npx superwiki install --project ~/code/my-app all
   npx superwiki uninstall copilot
 
@@ -49,23 +57,57 @@ if (argv.includes('-v') || argv.includes('--version')) { console.log(JSON.parse(
 const command = argv[0];
 if (command !== 'install' && command !== 'uninstall') fail(`unknown command: ${command}\n\n${HELP}`);
 let project = '';
+let global = false;
 let link = false;
 let force = false;
 const targets = [];
 for (let i = 1; i < argv.length; i++) {
   const a = argv[i];
   if (a === '--project') { project = argv[++i] || fail('--project needs a folder'); }
+  else if (a === '--global') global = true;
   else if (a === '--link') link = true;
   else if (a === '--force') force = true;
   else if (a === 'all') targets.push('claude', 'codex', 'copilot');
   else if (TARGETS.includes(a)) targets.push(a);
   else fail(`unknown argument: ${a}\n\n${HELP}`);
 }
+if (global && project) fail('--global and --project exclude each other: name one place');
 if (!targets.length) fail(`name at least one target: ${TARGETS.join(', ')}, all`);
 if (!existsSync(skillsDir)) fail(`no skills/ folder in ${root}`, 1);
 if (project) {
   if (!existsSync(project) || !statSync(project).isDirectory()) fail(`no such project folder: ${project}`, 1);
   project = realpathSync(project);
+}
+
+// The one question of an install. True means the current directory, as a project. Input that
+// ends before a valid answer counts as the default, the home folder.
+async function askForProject(cwd) {
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  // A last line and the end of input can arrive together; the line has to win, so the end waits a turn.
+  const ended = new Promise(done => rl.once('close', () => setImmediate(done, null)));
+  console.log(`Where should the skills go?
+  1) home folder: every project on this machine
+  2) this project (${cwd}): committed with the repository, so cloud agents get them`);
+  try {
+    for (;;) {
+      const answer = await Promise.race([rl.question('Choice [1]: ').catch(() => null), ended]);
+      if (answer === null) return false;
+      const choice = answer.trim();
+      if (choice === '' || choice === '1') return false;
+      if (choice === '2') return true;
+      console.log('Answer 1 or 2.');
+    }
+  } finally {
+    rl.close();
+  }
+}
+
+if (command === 'install' && !project && !global && process.stdin.isTTY) {
+  const cwd = realpathSync(process.cwd());
+  if (await askForProject(cwd)) project = cwd;
+}
+if (command === 'install' && link && project) {
+  console.error('warning: --link into a project: the links point into this machine and will not work in a clone or a cloud session; leave --link out to copy');
 }
 
 const destFor = t => (project

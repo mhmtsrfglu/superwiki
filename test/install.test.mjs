@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, existsSync, lstatSync, readlinkSync, mkdirSync, writeFileSync, readdirSync, symlinkSync } from 'node:fs';
+import { mkdtempSync, existsSync, lstatSync, readFileSync, readlinkSync, mkdirSync, writeFileSync, readdirSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -10,7 +10,10 @@ const repo = new URL('..', import.meta.url).pathname.replace(/\/$/, '');
 const skills = readdirSync(join(repo, 'skills')).filter(n => n.startsWith('sw-'));
 const home = () => mkdtempSync(join(tmpdir(), 'sw-home-'));
 const bin = new URL('../bin/superwiki.mjs', import.meta.url).pathname;
-const cli = (HOME, ...args) => spawnSync('node', [bin, ...args], { encoding: 'utf8', env: { ...process.env, HOME } });
+// Run from `cwd`: the folder an install would offer as "this project". Stdin is a pipe, not a terminal.
+const cliIn = (cwd, HOME, ...args) => spawnSync('node', [bin, ...args], { encoding: 'utf8', cwd, env: { ...process.env, HOME } });
+const cli = (HOME, ...args) => cliIn(process.cwd(), HOME, ...args);
+const project = () => mkdtempSync(join(tmpdir(), 'sw-proj-'));
 const run = (HOME, ...args) => spawnSync('bash', [script, ...args], { encoding: 'utf8', env: { ...process.env, HOME, SUPERWIKI_HOME: '' } });
 
 test('each target links every skill into the folder that agent reads', () => {
@@ -86,4 +89,51 @@ test('npx entry point: copies by default, updates its own copies, uninstalls the
   assert.ok(!existsSync(join(h, '.claude/skills/sw-init')));
   assert.ok(existsSync(join(h, '.agents/skills/sw-init')));
   assert.match(cli(h, '--version').stdout, /^\d+\.\d+\.\d+/);
+});
+
+test('without a terminal nothing is asked and the home folder is used; --global says the same in advance', () => {
+  for (const flags of [[], ['--global']]) {
+    const h = home();
+    const p = project();
+    const r = cliIn(p, h, 'install', ...flags, 'claude');
+    assert.equal(r.status, 0, r.stderr);
+    assert.doesNotMatch(r.stdout, /Where should/);
+    for (const s of skills) assert.ok(existsSync(join(h, '.claude/skills', s, 'SKILL.md')), s);
+    assert.ok(!existsSync(join(p, '.claude')));
+  }
+});
+
+test('--project installs marked copies into the project and nothing into the home folder', () => {
+  const h = home();
+  const p = project();
+  const r = cli(h, 'install', '--project', p, 'claude', 'codex');
+  assert.equal(r.status, 0, r.stderr);
+  for (const dir of ['.claude/skills', '.agents/skills']) {
+    for (const s of skills) {
+      assert.ok(!lstatSync(join(p, dir, s)).isSymbolicLink());
+      assert.ok(existsSync(join(p, dir, s, '.sw-installed')), `${dir}/${s}`);
+    }
+  }
+  assert.deepEqual(readdirSync(h), []);
+  assert.equal(cli(h, 'install', '--global', '--project', p, 'claude').status, 2, 'two places at once');
+});
+
+test('--link into a project warns that the links stay on this machine', () => {
+  const h = home();
+  const linked = cli(h, 'install', '--project', project(), '--link', 'claude');
+  assert.equal(linked.status, 0, linked.stderr);
+  assert.match(linked.stderr, /links point into this machine/);
+  assert.doesNotMatch(cli(h, 'install', '--link', 'claude').stderr, /links point/);
+  assert.doesNotMatch(cli(h, 'install', '--project', project(), 'claude').stderr, /links point/);
+});
+
+test('a foreign skill of the same name in a project is kept and reported', () => {
+  const p = project();
+  mkdirSync(join(p, '.claude/skills/sw-init'), { recursive: true });
+  writeFileSync(join(p, '.claude/skills/sw-init/SKILL.md'), 'mine');
+  const r = cli(home(), 'install', '--project', p, 'claude');
+  assert.equal(r.status, 1);
+  assert.match(r.stdout, /skipped {2}sw-init/);
+  assert.equal(readFileSync(join(p, '.claude/skills/sw-init/SKILL.md'), 'utf8'), 'mine');
+  assert.ok(existsSync(join(p, '.claude/skills/sw-plan/.sw-installed')));
 });

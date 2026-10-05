@@ -115,6 +115,8 @@ export function buildVault(files) {
       deps: asList(d.deps).map(String), softDeps: asList(d.soft_deps).map(String),
       milestone: d.milestone || '', priority: d.priority == null || d.priority === '' ? null : Number(d.priority),
       started: d.started || '', finished: d.finished || '',
+      // Any value asks for a separate review before the task may be done; the value names the kind.
+      review: d.review ? String(d.review) : '',
       state: null, wave: 0, dependents: [], plan: null,
     });
   }
@@ -436,12 +438,13 @@ function check(ctx) {
     : `can start: n/a, status is ${t.status}${openDeps}`;
   const draft = t.plan?.data.status === 'draft' ? '  (draft, not approved)' : '';
   return {
-    data: { id: t.id, status: t.status, canStart, canFinish, openDeps: t.openDeps, openSoftDeps, plan },
+    data: { id: t.id, status: t.status, canStart, canFinish, openDeps: t.openDeps, openSoftDeps, plan, review: t.review || null },
     text: [
       `${t.id}  ${t.status}  ${t.title}`,
       startLine,
       `can finish: ${canFinish ? 'yes' : 'no'}${openSoftDeps.length ? `  open soft deps: ${openSoftDeps.join(', ')}` : ''}`,
       `plan: ${plan ? plan + draft : 'none'}`,
+      `review: ${t.review ? `required (${t.review})` : 'not required'}`,
     ].join('\n'),
   };
 }
@@ -466,6 +469,7 @@ function explain(ctx) {
     t.priority != null && `priority: ${t.priority}`,
     t.started && `started: ${t.started}`,
     t.finished && `finished: ${t.finished}`,
+    t.review && `review: ${t.review}`,
   ].filter(Boolean);
   return {
     data: {

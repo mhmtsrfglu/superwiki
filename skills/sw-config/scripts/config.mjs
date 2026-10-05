@@ -21,6 +21,11 @@ const ROLES = {
     instructions: 'implementer.md',
     description: 'Implements one Superwiki task from its task and plan files. Use from sw-implement.',
   },
+  review: {
+    name: 'sw-reviewer',
+    instructions: 'reviewer.md',
+    description: 'Reviews the implementation of one Superwiki task from a clean context. Use from sw-implement.',
+  },
 };
 
 // How each tool wants an agent defined: where the file goes and what it looks like.
@@ -81,7 +86,7 @@ function loadConfig(root) {
   const path = join(root, 'docs/.sw/config.json');
   if (!existsSync(path)) throw new UsageError('no docs/.sw/config.json here; run sw-init first');
   const config = JSON.parse(readFileSync(path, 'utf8'));
-  config.models = { plan: {}, implement: {}, ...config.models };
+  config.models = { ...Object.fromEntries(ROLE_NAMES.map(role => [role, {}])), ...config.models };
   config.tools ??= [];
   return { config, save: () => writeFileSync(path, JSON.stringify(config, null, 2) + '\n') };
 }

@@ -28,7 +28,7 @@ docs/            the vault
 ## Formats
 
 - Links inside the vault are wikilinks, `[[file-name]]`; file names are unique across `wiki/`, `tasks/` and `plans/`. `raw/` files and URLs use normal markdown links; code is referred to by plain path.
-- Task frontmatter: required `id`, `title`, `status`, `deps`; optional `soft_deps`, `milestone`, `priority`, `started`, `finished`.
+- Task frontmatter: required `id`, `title`, `status`, `deps`; optional `soft_deps`, `milestone`, `priority`, `review`, `started`, `finished`. Any value in `review` asks for a separate review before the task can be done.
 - Statuses: `todo`, `in-progress`, `done`, `cancelled`. Cancelled tasks stay on disk; ids are never reused.
 - `deps` must be done before a task starts. `soft_deps` allow starting but block finishing.
 - Execution order is derived from dependencies plus optional `priority`. There is no stored sequence number, summary table or dependency table.
@@ -63,6 +63,17 @@ What a task costs is what the agents read, and each extra step re-sends everythi
 
 A check that starts services or changes data is marked `needs:` in the plan and runs only with the user's yes.
 
+### Why the work runs in subagents
+
+The session logs of a second project, where planning, implementing and reviewing all ran in one long session, show what the alternative costs: 352 steps sent 100 million input tokens, an average of 284k per step, with contexts between 250k and 640k. Every step paid for the whole accumulated context, and a session held 70k tokens before it had read anything.
+
+Superwiki therefore keeps the main session out of the work. It reads the task file and the reports; the code, the plan and the review are read in subagents that start clean and end with the task. Two consequences:
+
+- **A review is a separate, clean context.** A task whose frontmatter has `review:` is reviewed by a reviewer subagent after the implementer's report passes: it lists what the change claims, tries to break each claim, and classifies what it finds. It sees the change, not the reasoning that produced it, and its instructions forbid editing the repository. Blocking findings go back to the implementer, twice at most, then to the user.
+- **One task, one session.** `sw-implement` ends by saying so. The task is recorded in files, so nothing is lost by starting fresh, and the next task does not pay for this one's history.
+
+Running subagents is not free: each one reads the task and the code again. The saving comes from moving many steps out of a large context into a small one, so it grows with the length of the work. It has been estimated from the two projects above, not yet measured on one task run both ways.
+
 ## Skills
 
 | Skill | Purpose |
@@ -71,12 +82,12 @@ A check that starts services or changes data is marked `needs:` in the plan and 
 | `sw-migrate` | convert a table-based task index, on a new git branch |
 | `sw-ingest` | turn a raw source into wiki pages |
 | `sw-plan` | decide whether a plan is needed; have the planner subagent write it; get approval |
-| `sw-implement` | run a task with the implementer subagent, check every requirement, record the result |
+| `sw-implement` | run a task with the implementer subagent, check every requirement, have it reviewed where the task asks for that, record the result |
 | `sw-explain` | explain one task: what, why, dependencies, what it unblocks |
 | `sw-triage` | for a reported problem: earlier occurrences, lessons, likely causes; fixes nothing |
 | `sw-lint` | script checks first; semantic review as a separate, approved pass |
 | `sw-visualize` | open the viewer |
-| `sw-config` | areas, and the model each tool uses for planning and implementing |
+| `sw-config` | areas, and the model each tool uses for planning, implementing and reviewing |
 
 The schema block in `AGENTS.md` holds the rules that must apply without any command: read the index first, keep task status and the log current, log work that belongs to no task. It also tells the agent which skill to reach for without being asked, ahead of other planning or debugging skills; a skill's description alone proved too weak a trigger when another skill set competes for the same words.
 
@@ -84,7 +95,7 @@ The schema block in `AGENTS.md` holds the rules that must apply without any comm
 
 One `skills/` directory serves every agent. `npx superwiki install <target>` copies the skills into the folder a tool reads; `install.sh` links them from a clone. Invocation differs by tool: `/sw-init` (Claude Code, Copilot CLI), `$sw-init` (Codex).
 
-No tool lets a skill change the running session's model, and only Claude Code lets a skill enter plan mode. Model choice therefore works the same way everywhere: planning and implementing run in subagents defined by files that carry a model (`.claude/agents/*.md`, `.codex/agents/*.toml`, `.github/agents/*.agent.md`), written by `sw-config`.
+No tool lets a skill change the running session's model, and only Claude Code lets a skill enter plan mode. Model choice therefore works the same way everywhere: planning, implementing and reviewing run in subagents defined by files that carry a model (`.claude/agents/*.md`, `.codex/agents/*.toml`, `.github/agents/*.agent.md`), written by `sw-config`. A project whose own rules forbid subagents still works: the skills then follow the role's instructions in the main session and say that the clean context was not used.
 
 ## Viewer and CLI
 
@@ -96,7 +107,9 @@ No tool lets a skill change the running session's model, and only Claude Code le
 
 ## Migration
 
-`sw-migrate` samples the existing structure, writes a mapping, shows a dry run for approval, converts in bulk with a script on a new git branch and compares counts before and after. It never merges. What it does not convert (rules and milestones in the old index, other document folders, instruction files that describe the old index) is listed for the user to decide.
+`sw-migrate` never reads the old index. The script's `--inspect` prints the task tables, their columns, the values of status-like columns and the files with per-task headings; from that the agent writes a mapping. A dry run lists problems that must be fixed and, separately, what is only for information. The conversion runs on a branch of its own and never merges.
+
+A mapping can keep any column as a frontmatter field (a review class becomes `review:`) or as a body section. Superwiki owns `docs/wiki/`, `docs/tasks/` and `docs/plans/`: a file already there that the mapping does not consume is a problem until it is named in `archiveAlso`. Everything consumed or archived moves to `docs/legacy/` with its layout and with working links. What is not converted (rules and milestones in the old index, other document folders, instruction files that describe the old index) is listed for the user to decide.
 
 ## What has been proven
 
@@ -105,7 +118,7 @@ No tool lets a skill change the running session's model, and only Claude Code le
 | Core, CLI, installer | unit tests (`npm test`) |
 | Viewer | headless Chromium on the demo vault and on a migrated 165-task project |
 | `sw-init` | followed by a fresh agent on a scratch project |
-| `sw-migrate` | followed twice by a fresh agent on a real 165-task project; an independent parse of the source confirmed every field of every task, all detail text and zero broken links |
+| `sw-migrate` | an earlier version followed twice by a fresh agent on a real 165-task project; an independent parse of the source confirmed every field of every task, all detail text and zero broken links. The current script (inspect, extra fields, `archiveAlso`) converts a copy of a second, 48-task project with matching counts and no lint findings; the current skill text has not been followed by an agent |
 | `sw-ingest`, `sw-lint`, `sw-explain`, `sw-triage` | followed once by a fresh agent on a copy of the demo vault, then revised |
 | `sw-implement` without a plan | run three times on real tasks with the implementer on a cheaper model; code, tests and repository checks passed each time, the visual checks were not allowed to run |
 | `sw-plan` with `sw-implement` | run end to end once on a real task with an earlier version of both skills |
@@ -115,9 +128,11 @@ No tool lets a skill change the running session's model, and only Claude Code le
 
 - Whether the cost rules hold on a project unlike the one they were measured on.
 - The current planner and implementer instructions, including the requirement list, have not been run; neither has `sw-plan` since the planner began writing the plan file itself.
+- The review step and the reviewer's instructions have not been run.
+- Whether running the work in subagents saves what the estimate says, measured on one task both ways.
 - Whether the schema block makes agents reach for the skills unprompted.
 - Claude Code: the generated `sw-planner` and `sw-implementer` agents and presenting a plan through plan mode have not been tried; every run so far used the fallback agents.
 - Copilot CLI: whether the `model:` field of a generated agent file is honoured.
 - `sw-visualize` skill text has not been followed by an agent.
 - Plugin manifests (`.claude-plugin`, `.codex-plugin`) validate but have not been installed.
-- Migration leaves links in files outside `docs/` (for example `architecture.md`) pointing at archived files, and its sampling commands do not fit every index layout.
+- Migration leaves links in files outside `docs/` (for example `architecture.md`) pointing at archived files.

@@ -159,12 +159,12 @@ A project's `docs/` folder is plain markdown and keeps working as an Obsidian va
 | `sw-migrate` | convert an existing table-based task index, on a new git branch |
 | `sw-ingest` | file a source into the wiki |
 | `sw-plan` | plan a task with the planner subagent and get your approval |
-| `sw-implement` | run a task with the implementer subagent and record the result |
+| `sw-implement` | run a task with the implementer subagent, have it reviewed if the task asks for that, and record the result |
 | `sw-explain` | explain a task: what, why, dependencies, what it unblocks |
 | `sw-triage` | for a problem: seen before? lessons, likely causes |
 | `sw-lint` | structural checks by script, semantic review on request |
 | `sw-visualize` | open the viewer |
-| `sw-config` | the model each tool uses for planning and implementing; task areas |
+| `sw-config` | the model each tool uses for planning, implementing and reviewing; task areas |
 
 ### Examples
 
@@ -188,7 +188,7 @@ Shown as typed in Claude Code. In Codex, write `$sw-plan` instead of `/sw-plan`.
 /sw-ingest ~/Downloads/interview-notes.md
                                   file a source and summarise it into the wiki
 
-/sw-config plan with opus, implement with sonnet
+/sw-config plan with opus, implement with sonnet, review with opus
 /sw-lint                          check links, frontmatter and task dependencies
 /sw-visualize                     open the task board and the wiki in the browser
 ```

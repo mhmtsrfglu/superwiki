@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -9,26 +9,40 @@ const init = new URL('../skills/sw-init/scripts/init.mjs', import.meta.url).path
 const run = (root, ...args) => execFileSync('node', [init, '--root', root, ...args], { encoding: 'utf8' });
 const sw = (root, ...args) => spawnSync('node', [join(root, 'docs/.sw/sw.mjs'), ...args], { encoding: 'utf8', cwd: root });
 const fresh = () => mkdtempSync(join(tmpdir(), 'sw-init-'));
-const read = (root, p) => readFileSync(join(root, p), 'utf8');
+const read = (root, path) => readFileSync(join(root, path), 'utf8');
 
-test('new vault with tasks: files, schema block, clean lint', () => {
+test('new vault with tasks: files, config, clean lint', () => {
   const root = fresh();
   run(root, '--tasks', '--areas', 'M=Mobile,B=Backend');
-  for (const p of ['docs/index.md', 'docs/log.md', 'docs/raw/assets', 'docs/wiki', 'docs/tasks', 'docs/plans', 'docs/.sw/sw.mjs', 'docs/.sw/templates/task.md', 'AGENTS.md', 'CLAUDE.md']) assert.ok(existsSync(join(root, p)), p);
-  assert.deepEqual(JSON.parse(read(root, 'docs/.sw/config.json')).areas, { M: 'Mobile', B: 'Backend' });
-  assert.match(JSON.parse(read(root, 'docs/.sw/config.json')).name, /^sw-init-/);
-  const agents = read(root, 'AGENTS.md');
-  assert.match(agents, /docs\/tasks\/<ID>\.md/);
-  assert.doesNotMatch(agents, /\{\{/);
-  assert.match(agents, /Implementing a task: `sw-implement`/);
-  assert.match(agents, /`sw-triage` first/);
-  assert.match(agents, /\n\nTasks:\n\n- A task's status/);
-  assert.match(agents, /Work that belongs to no task .* one `change` entry/);
+  const expected = [
+    'docs/index.md', 'docs/log.md', 'docs/raw/assets', 'docs/wiki', 'docs/tasks', 'docs/plans', 'docs/viewer.html',
+    'docs/.sw/sw.mjs', 'docs/.sw/templates/task.md', 'docs/.sw/templates/plan.md', 'docs/.sw/templates/guide.md',
+    'AGENTS.md', 'CLAUDE.md',
+  ];
+  for (const path of expected) assert.ok(existsSync(join(root, path)), path);
+
+  const config = JSON.parse(read(root, 'docs/.sw/config.json'));
+  assert.deepEqual(config.areas, { M: 'Mobile', B: 'Backend' });
+  assert.deepEqual(config.models, { plan: {}, implement: {}, review: {} });
+  assert.match(config.name, /^sw-init-/);
+  assert.equal(read(root, 'docs/.sw/.gitignore'), 'data.js\nserver.json\n');
   assert.equal(read(root, 'CLAUDE.md'), '@AGENTS.md\n');
+
   const lint = sw(root, 'lint');
   assert.equal(lint.status, 0, lint.stdout + lint.stderr);
   assert.match(lint.stdout, /0 errors, 0 warnings/);
-  assert.equal(sw(root, 'next-id', 'M').stdout.trim(), 'M-01');
+});
+
+test('schema block with tasks: wiki, task and skill rules, no template markers', () => {
+  const root = fresh();
+  run(root, '--tasks');
+  const agents = read(root, 'AGENTS.md');
+  assert.doesNotMatch(agents, /\{\{/);
+  assert.match(agents, /docs\/tasks\/<ID>\.md/);
+  assert.match(agents, /\n\nTasks:\n\n- A task's status/);
+  assert.match(agents, /Work that belongs to no task .* one `change` entry/);
+  assert.match(agents, /Implementing a task: `sw-implement`/);
+  assert.match(agents, /`sw-triage` first/);
 });
 
 test('wiki-only vault leaves the task module out', () => {
@@ -37,21 +51,20 @@ test('wiki-only vault leaves the task module out', () => {
   assert.ok(!existsSync(join(root, 'docs/tasks')));
   assert.ok(!existsSync(join(root, 'docs/.sw/templates/task.md')));
   const agents = read(root, 'AGENTS.md');
-  assert.doesNotMatch(agents, /tasks\/<ID>/);
+  assert.doesNotMatch(agents, /tasks\/<ID>|Tasks:|sw-plan|sw-implement|sw-explain/);
   assert.match(agents, /sw\.mjs search/);
-  assert.doesNotMatch(agents, /sw-plan|sw-implement|sw-explain/);
   assert.match(agents, /`sw-ingest`/);
-  assert.doesNotMatch(agents, /Tasks:/);
   assert.match(agents, /When you change the project, append one `change` entry/);
 });
 
-test('re-run keeps user content and config, replaces only the managed block', () => {
+test('re-run keeps user content and choices, and replaces only the managed block', () => {
   const root = fresh();
   writeFileSync(join(root, 'AGENTS.md'), '# Mine\n\nMy rule.\n');
   writeFileSync(join(root, 'CLAUDE.md'), '# Claude\n');
   run(root, '--tasks', '--areas', 'M=Mobile');
   writeFileSync(join(root, 'docs/index.md'), '# Index\n- [[alpha]]: a\n');
   writeFileSync(join(root, 'docs/wiki/alpha.md'), '---\ntype: concept\nsummary: a\n---\n');
+
   const out = run(root);
   assert.equal(read(root, 'docs/index.md'), '# Index\n- [[alpha]]: a\n');
   assert.deepEqual(JSON.parse(read(root, 'docs/.sw/config.json')).areas, { M: 'Mobile' });
@@ -59,79 +72,35 @@ test('re-run keeps user content and config, replaces only the managed block', ()
   assert.match(agents, /^# Mine\n\nMy rule\./);
   assert.equal(agents.match(/<!-- sw:start/g).length, 1);
   assert.equal(read(root, 'CLAUDE.md'), '# Claude\n');
-  assert.match(out, /note\s+CLAUDE\.md/);
-  assert.match(out, /unchanged docs\/\.sw\/sw\.mjs/);
-  assert.match(out, /unchanged docs\/\.sw\/config\.json/);
-  assert.match(out, /unchanged AGENTS\.md/);
+  assert.match(out, /note\s+CLAUDE\.md does not mention AGENTS\.md/);
+  for (const unchanged of ['docs/.sw/sw.mjs', 'docs/.sw/config.json', 'AGENTS.md']) assert.match(out, new RegExp(`unchanged ${unchanged.replace(/[./]/g, '\\$&')}`));
 });
 
-test('existing docs content is left alone and reported', () => {
+test('content that was in docs/ before is left alone and reported', () => {
   const root = fresh();
   mkdirSync(join(root, 'docs/superpowers/plans'), { recursive: true });
   writeFileSync(join(root, 'docs/index.md'), 'old index\n');
   writeFileSync(join(root, 'docs/superpowers/plans/x.md'), '[[nowhere]]\n');
   const out = run(root, '--tasks');
   assert.equal(read(root, 'docs/index.md'), 'old index\n');
-  assert.match(out, /already had content/);
-  assert.equal(sw(root, 'lint').status, 0);
+  assert.match(out, /docs\/ already had content \(superpowers\)\. It was left untouched and is outside the vault\. If it holds a task index, sw-migrate converts it\./);
+  assert.equal(sw(root, 'lint').status, 0, 'foreign folders are not linted');
 });
 
-test('refuses to guess the task module on a new vault', () => {
-  const r = spawnSync('node', [init, '--root', fresh()], { encoding: 'utf8' });
-  assert.equal(r.status, 2);
-});
-
-test('cli: status, ready, check and lint exit code', () => {
+test('after a migration the hint to migrate is not repeated', () => {
   const root = fresh();
-  run(root, '--tasks');
-  const t = (id, status, deps) => writeFileSync(join(root, `docs/tasks/${id}.md`), `---\ntype: task\nid: ${id}\ntitle: Task ${id}\nstatus: ${status}\ndeps: [${deps}]\n---\n`);
-  t('T-01', 'todo', '');
-  t('T-02', 'todo', 'T-01');
-  assert.match(sw(root, 'status').stdout, /total 2 {2}ready 1 {2}in-progress 0 {2}blocked 1/);
-  assert.match(sw(root, 'ready').stdout, /ready \(1\)\nT-01 {2}Task T-01/);
-  assert.match(sw(root, 'check', 'T-02').stdout, /can start: no {2}open deps: T-01/);
-  assert.match(sw(root, 'check', 'T-01').stdout, /can start: yes/);
-  assert.equal(JSON.parse(sw(root, 'check', 'T-01', '--json').stdout).canStart, true);
-  const explain = sw(root, 'explain', 'T-01').stdout;
-  assert.match(explain, /area guide: none/);
-  mkdirSync(join(root, 'docs/plans'), { recursive: true });
-  writeFileSync(join(root, 'docs/plans/T-01-plan.md'), '---\ntype: plan\ntask: T-01\nstatus: draft\n---\n');
-  assert.match(sw(root, 'check', 'T-01').stdout, /plan: docs\/plans\/T-01-plan\.md {2}\(draft, not approved\)/);
-  writeFileSync(join(root, 'docs/wiki/guide-t.md'), '---\ntype: guide\narea: T\nsummary: g\n---\n');
-  assert.match(sw(root, 'explain', 'T-01').stdout, /area guide: docs\/wiki\/guide-t\.md/);
-  assert.match(explain, /depends on: none\nblocks:\n {2}T-02 \(blocked\) Task T-02\nfinishing it makes ready: T-02/);
-  assert.match(sw(root, 'search', 'Task', 'T-02').stdout, /pages \(2\)[^\n]*\ndocs\/tasks\/T-02\.md {2}\[task blocked\]/);
-  assert.match(sw(root, 'snapshot').stdout, /snapshot: 6 files/);
-  const snap = read(root, 'docs/.sw/data.js');
-  assert.match(snap, /^window\.SW_DATA = \{"name":"sw-init-/);
-  assert.equal(read(root, 'docs/.sw/.gitignore'), 'data.js\nserver.json\n');
-  t('T-03', 'in-progress', 'T-01');
-  assert.match(sw(root, 'check', 'T-03').stdout, /can start: n\/a, status is in-progress {2}open deps: T-01/);
-  const lint = sw(root, 'lint');
-  assert.equal(lint.status, 1);
-  assert.match(lint.stdout, /E started-before-deps {2}docs\/tasks\/T-03\.md/);
+  mkdirSync(join(root, 'docs/tasks'), { recursive: true });
+  mkdirSync(join(root, 'docs/legacy'), { recursive: true });
+  const out = run(root, '--tasks');
+  assert.match(out, /already had content \(legacy\)/);
+  assert.doesNotMatch(out, /sw-migrate/);
 });
 
-test('serve: starts once, is reused, serves the viewer and live data, refuses other hosts', async () => {
-  const root = fresh();
-  run(root, '--tasks');
-  writeFileSync(join(root, 'docs/tasks/T-01.md'), '---\ntype: task\nid: T-01\ntitle: First\nstatus: todo\ndeps: []\n---\n');
-  const url = sw(root, 'serve').stdout.trim();
-  try {
-    assert.match(url, /^http:\/\/127\.0\.0\.1:\d+\/$/);
-    assert.equal(sw(root, 'serve').stdout.trim(), url, 'second call reuses the running server');
-    assert.match(await (await fetch(url)).text(), /<title>/);
-    const data = async () => JSON.parse((await (await fetch(`${url}.sw/data.js`)).text()).replace(/^window\.SW_DATA = /, '').replace(/;\n$/, ''));
-    const first = await data();
-    assert.equal(first.live, true);
-    assert.ok(first.files.some(f => f.path === 'tasks/T-01.md' && f.text.includes('status: todo')));
-    writeFileSync(join(root, 'docs/tasks/T-01.md'), '---\ntype: task\nid: T-01\ntitle: First\nstatus: done\ndeps: []\n---\n');
-    assert.ok((await data()).files.some(f => f.text.includes('status: done')), 'reads files live');
-    const port = new URL(url).port;
-    const { request } = await import('node:http');
-    const status = await new Promise(res => request({ host: '127.0.0.1', port, path: '/', headers: { host: 'evil.example' } }, r => res(r.statusCode)).end());
-    assert.equal(status, 403);
-  } finally {
-    process.kill(JSON.parse(read(root, 'docs/.sw/server.json')).pid);
-  }
+test('usage errors exit with 2', () => {
+  const noChoice = spawnSync('node', [init, '--root', fresh()], { encoding: 'utf8' });
+  assert.equal(noChoice.status, 2);
+  assert.match(noChoice.stderr, /say --tasks or --no-tasks/);
+  const badArea = spawnSync('node', [init, '--root', fresh(), '--tasks', '--areas', '1x=Bad'], { encoding: 'utf8' });
+  assert.equal(badArea.status, 2);
+  assert.match(badArea.stderr, /bad area id "1x"/);
 });

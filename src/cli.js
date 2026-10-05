@@ -121,12 +121,13 @@ function check(ctx) {
     : `can start: n/a, status is ${t.status}${openDeps}`;
   const draft = t.plan?.data.status === 'draft' ? '  (draft, not approved)' : '';
   return {
-    data: { id: t.id, status: t.status, canStart, canFinish, openDeps: t.openDeps, openSoftDeps, plan },
+    data: { id: t.id, status: t.status, canStart, canFinish, openDeps: t.openDeps, openSoftDeps, plan, review: t.review || null },
     text: [
       `${t.id}  ${t.status}  ${t.title}`,
       startLine,
       `can finish: ${canFinish ? 'yes' : 'no'}${openSoftDeps.length ? `  open soft deps: ${openSoftDeps.join(', ')}` : ''}`,
       `plan: ${plan ? plan + draft : 'none'}`,
+      `review: ${t.review ? `required (${t.review})` : 'not required'}`,
     ].join('\n'),
   };
 }
@@ -151,6 +152,7 @@ function explain(ctx) {
     t.priority != null && `priority: ${t.priority}`,
     t.started && `started: ${t.started}`,
     t.finished && `finished: ${t.finished}`,
+    t.review && `review: ${t.review}`,
   ].filter(Boolean);
   return {
     data: {

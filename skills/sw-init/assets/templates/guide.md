@@ -24,8 +24,9 @@ updated: YYYY-MM-DD
 - What went wrong before and how to avoid it.
 
 <!--
-One guide per task area: docs/wiki/guide-<area, lowercase>.md, listed in index.md.
-Planners and implementers read it instead of exploring, and report what it was missing;
-sw-implement adds those lines. One line per fact, 60 lines at most: replace stale lines,
-do not append forever. Delete this comment.
+Optional. At most one guide per task area: docs/wiki/guide-<area, lowercase>.md, listed in index.md.
+Start one when several tasks in an area have needed the same facts. Where a guide exists,
+planners and implementers read it first and report what it was missing, and sw-implement
+adds those lines. One line per fact, 60 lines at most: replace stale lines, do not append
+forever. Delete this comment.
 -->

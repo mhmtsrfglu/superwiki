@@ -23,29 +23,34 @@ Run commands from the project root. `<skill-dir>` is the directory this SKILL.md
 5. **Dispatch the implementer.** Its prompt is the task id, the project root if it is not your working directory, and which `needs:` checks it may run. Do not paste the plan into the prompt; it reads the files.
 
    | Tool | How |
-   |---|---|
-   | Claude Code | agent `sw-implementer`. If it is not among your agent types, use a general-purpose agent, put the content of `<skill-dir>/../sw-config/assets/implementer.md` at the top of its prompt, and pass the model from `models.implement.claude` in `docs/.sw/config.json` if set |
+   | --- | --- |
+   | Claude Code | agent `sw-implementer`. If it is not among your agent types, use a general-purpose agent, tell it to read `<skill-dir>/../sw-config/assets/implementer.md` first and follow it, and pass the model from `models.implement.claude` in `docs/.sw/config.json` if set |
    | Codex | spawn the custom agent `sw_implementer` |
    | Copilot CLI | `task` tool with agent `sw-implementer` |
    | No subagents available, or the agent is not defined | follow `implementer.md` yourself, in this session, and tell the user the configured model was not used |
 
-6. **Judge the report** against the task's "Done when" list. Every item needs evidence: a command and its result. Re-run one verification command yourself when the report is vague. An item without evidence is not met.
+6. **Judge the report.** Its `Requirements:` list must name every "Done when" item and every scope, state or constraint item of the task; compare it with the task file.
+   - `met` needs evidence: a command or test and its result. Re-run one verification command yourself when the evidence is vague.
+   - `not met`, or missing from the list: the task is not done.
+   - `differs`: the implementer built something other than what the task says. That is the user's call: show it and ask. Until they accept it, the item is not met.
 7. **Record the outcome.**
 
    | Outcome | Task file | Log entry |
-   |---|---|---|
-   | Every item met, and `check <ID>` says `can finish: yes` | `status: done`, `finished:` today | `task \| <ID> done`, then one body line on what was verified |
-   | Items met but soft deps open | stays `in-progress` | `task \| <ID> waiting on <ids>` |
-   | Blocked or partly done | stays `in-progress`; add what is left to "Notes" | `task \| <ID> blocked: <reason>` |
+   | --- | --- | --- |
+   | Every requirement met or accepted, and `check <ID>` says `can finish: yes` | `status: done`, `finished:` today | `task \| <ID> done`, then one body line on what was verified |
+   | Requirements met but soft deps open | stays `in-progress` | `task \| <ID> waiting on <ids>` |
+   | Anything not met, unverified or awaiting the user's call | stays `in-progress`; add what is left to "Notes" | `task \| <ID> blocked: <reason>` |
 
-8. **Keep the area guide.** Add the report's `Guide:` lines to the guide of the task's area, `docs/wiki/guide-<area, lowercase>.md` (`type: guide`, `area: <AREA>`; `node docs/.sw/sw.mjs explain <ID>` prints its path). No guide yet: create it from `docs/.sw/templates/guide.md` and list it in `index.md`. One line per fact under Layout, Patterns, Verify or Gotchas; replace a line the new fact corrects; keep the page under 60 lines. Do this without asking: the guide is what makes the next task in this area cheaper, because planners and implementers read it instead of exploring.
+8. **Keep the area guide, if the area has one.** `node docs/.sw/sw.mjs explain <ID>` prints `area guide:` with a path or `none`.
+   - A guide exists: add the report's `Guide:` lines to it, one line per fact under Layout, Patterns, Verify or Gotchas. Replace a line the new fact corrects, and keep the page under 60 lines.
+   - No guide: do nothing. A guide is worth starting once several tasks in an area have needed the same facts; if the user asks for one, create `docs/wiki/guide-<area, lowercase>.md` from `docs/.sw/templates/guide.md` and list it in `index.md`.
 9. **File what else was learned.** If the implementer reported a decision or constraint the wiki should hold, offer to save it as a wiki page (`type: decision` or `concept`) and add it to `index.md`. If the task fixed a problem whose cause is now known, offer a `type: lesson` page (Symptom, Cause, Fix, How to notice it earlier); sw-triage finds these later. If it reported follow-up work, offer to create the tasks. These are separate offers: act on each only when the user says yes to that one.
-10. **Report** to the user: outcome, evidence per "Done when" item, files changed, deviations from the plan, and which tasks this unblocked (`node docs/.sw/sw.mjs ready`). Commit only if the user asks.
+10. **Report** to the user: outcome, each requirement with its evidence, anything that differs from the task, files changed, and which tasks this unblocked (`node docs/.sw/sw.mjs ready`). Commit only if the user asks.
 
 ## Common mistakes
 
-- Marking `done` because the implementer said so. Done means every "Done when" item has evidence.
+- Marking `done` because the implementer said so. Done means every requirement has evidence.
+- Accepting a `differs` item on the user's behalf. A sensible alternative is still not what the task asked for.
 - Starting work before the task file says `in-progress`. If the session dies, nobody knows the task was touched.
 - Letting the implementer edit the task file or the log. One writer for status: you.
 - Reading the plan or the code "to follow along". The implementer already paid for that.
-- Skipping the guide update. Every fact left out is explored again by the next task.

@@ -20,8 +20,8 @@ Needs the task module (`docs/tasks/`). If it is missing, say so and offer sw-ini
 4. **Dispatch the planner.** Its prompt is: the task id, today's date, the project root if it is not your working directory, and any feedback from an earlier round. It writes the plan file as a draft and returns a short message.
 
    | Tool | How |
-   |---|---|
-   | Claude Code | agent `sw-planner`. If it is not among your agent types, use a general-purpose agent, put the content of `<skill-dir>/../sw-config/assets/planner.md` at the top of its prompt, and pass the model from `models.plan.claude` in `docs/.sw/config.json` if set |
+   | --- | --- |
+   | Claude Code | agent `sw-planner`. If it is not among your agent types, use a general-purpose agent, tell it to read `<skill-dir>/../sw-config/assets/planner.md` first and follow it, and pass the model from `models.plan.claude` in `docs/.sw/config.json` if set |
    | Codex | spawn the custom agent `sw_planner` |
    | Copilot CLI | `task` tool with agent `sw-planner` |
    | No subagents available, or the agent is not defined | follow `planner.md` yourself, in this session, and tell the user the configured model was not used |
@@ -32,9 +32,9 @@ Needs the task module (`docs/tasks/`). If it is missing, say so and offer sw-ini
    - The user drops the plan: delete the draft file.
 6. **Record**, after approval:
    - in the plan file, change `status: draft` to `status: approved`;
-   - answers given in step 5: add to the task's "Notes";
-   - the planner's `Guide:` lines: add to the area guide (see sw-implement, "Keep the area guide");
-   - `docs/log.md`: append `## [date] plan | <ID>`, in the layout the log's last entries use.
+   - in the task's "Notes", the answers given in step 5;
+   - in the area guide, if `node docs/.sw/sw.mjs explain <ID>` names one, the planner's `Guide:` lines, one line per fact;
+   - in `docs/log.md`, a new entry `## [date] plan | <ID>`, in the layout the log's last entries use.
 
    Then run `node docs/.sw/sw.mjs lint`.
 7. **Stop.** Do not start implementing. Tell the user the plan is approved and that sw-implement `<ID>` runs it.

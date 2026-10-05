@@ -28,7 +28,7 @@ Tasks:
 
 - A task's status lives only in its frontmatter. Before you start: `status: in-progress` and `started:`. When its "Done when" list is met: `status: done` and `finished:`. Each change of status gets a `task` entry in `log.md`.
 - Do not start a task while any of its `deps` is not done.
-- Before you change code for a task, read the area guide that `explain <ID>` names (`docs/wiki/guide-<area>.md`): where things are, patterns, how to verify. Afterwards add the facts it was missing, one line each.
+- If `explain <ID>` names an area guide (`docs/wiki/guide-<area>.md`), read it before you change code for the task: where things are, patterns, how to verify. Afterwards add the facts it was missing, one line each.
 - Work that belongs to no task (a quick fix, a small request) needs no task file. Append one `change` entry to `log.md` instead: what changed and why, in a line.
 - `node docs/.sw/sw.mjs status|ready|check <ID>|explain <ID>|search <words>|next-id <AREA>|lint` answers overview, startable tasks, blockers, a task's place in the chain, where something is mentioned, new ids and structural checks without reading files. Run `lint` after you add, rename or relink pages.
 {{/tasks}}

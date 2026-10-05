@@ -23,7 +23,7 @@ docs/            the vault
 - No code repository is required. A bare folder works as a wiki-only vault.
 - Each repository has its own vault. A dependency on a task in another repository is written as plain text in the task's notes.
 - Anything else under `docs/` belongs to other tools. Lint and the viewer ignore it.
-- A page's kind is its `type` frontmatter field, not a folder. Types with a defined shape: `source` (summary of one raw file), `decision`, `lesson` (Symptom, Cause, Fix, How to notice it earlier), `guide` (how to work in one task area).
+- A page's kind is its `type` frontmatter field, not a folder. Types with a defined shape: `source` (summary of one raw file), `decision`, `lesson` (Symptom, Cause, Fix, How to notice it earlier), `guide` (how to work in one task area; optional).
 
 ## Formats
 
@@ -47,16 +47,21 @@ The design is driven by what an agent must read and write per task.
 
 ## Cost of a task
 
-Measured on a real project, a 65-line change that was planned by one subagent and implemented by another used about 234k tokens of context: both explored the same code, and the plan was long. Four rules follow.
+What a task costs is what the agents read, and each extra step re-sends everything read so far. The rules below come from measurements on one real project (a large monorepo) with small panel tasks, the planner on one model and the implementer on a cheaper one. Each figure is a single run: read it as direction, not as a number to expect elsewhere.
 
-- **Small tasks skip planning.** One area, three "Done when" items or fewer, nothing left open, a few files: `sw-implement` runs straight from the task file.
-- **Reading is bounded.** The planner reads to answer three questions (which files change, which pattern to copy, how to verify) and stops. The implementer opens what the plan lists under "Read first". Plans aim for 40 to 60 lines.
-- **Exploration is filed, not repeated.** Each task area has a guide page with layout, patterns, verification commands and gotchas. Planner and implementer read it first and report what it lacked; `sw-implement` adds those lines. The next task in the area starts from the guide.
+| Flow | Context used |
+| --- | --- |
+| Planner subagent, then implementer subagent | about 234k tokens |
+| Implementer only, no plan | 141k to 144k |
+| Implementer only, with the reading rules | about 115k |
+
+- **Small tasks skip planning.** One area, three "Done when" items or fewer, nothing left open, a few files: `sw-implement` runs straight from the task file. This was the largest saving. Its price: questions a planner would have put to the user are decided by the implementer and reported afterwards.
+- **Reading follows rules.** Locate before opening, open the range and not the file, one example per pattern, trust generated types, batch lookups, never read twice. On the same task from the same starting point this cut context by about a fifth and tool calls by a third.
+- **The task text decides the work.** In the measured run the cheaper implementation left out one of the states the task listed. The implementer therefore lists every requirement the task states and marks each `met`, `not met` or `differs`; `sw-implement` treats a missing or differing item as not done until the user accepts it.
 - **The plan does not pass through the main session.** The planner writes the plan file as `status: draft` and returns a few lines; approval changes it to `approved`. The main session reads neither the code nor the plan.
+- **Area guides are optional.** A guide page per task area (layout, patterns, verification commands, gotchas) is read first where it exists and extended after each task. In two measured runs it saved nothing visible: it held what the previous task had needed, and the next task needed something else. It stays as an option for areas where several tasks keep needing the same facts.
 
 A check that starts services or changes data is marked `needs:` in the plan and runs only with the user's yes.
-
-These rules are new and have not been measured yet.
 
 ## Skills
 
@@ -66,14 +71,14 @@ These rules are new and have not been measured yet.
 | `sw-migrate` | convert a table-based task index, on a new git branch |
 | `sw-ingest` | turn a raw source into wiki pages |
 | `sw-plan` | decide whether a plan is needed; have the planner subagent write it; get approval |
-| `sw-implement` | run a task with the implementer subagent, record the result, keep the area guide |
+| `sw-implement` | run a task with the implementer subagent, check every requirement, record the result |
 | `sw-explain` | explain one task: what, why, dependencies, what it unblocks |
 | `sw-triage` | for a reported problem: earlier occurrences, lessons, likely causes; fixes nothing |
 | `sw-lint` | script checks first; semantic review as a separate, approved pass |
 | `sw-visualize` | open the viewer |
 | `sw-config` | areas, and the model each tool uses for planning and implementing |
 
-The schema block in `AGENTS.md` holds the rules that must apply without any command: read the index first, keep task status and the log current, read the area guide before changing code. It also tells the agent which skill to reach for without being asked, ahead of other planning or debugging skills; a skill's description alone proved too weak a trigger when another skill set competes for the same words.
+The schema block in `AGENTS.md` holds the rules that must apply without any command: read the index first, keep task status and the log current, log work that belongs to no task. It also tells the agent which skill to reach for without being asked, ahead of other planning or debugging skills; a skill's description alone proved too weak a trigger when another skill set competes for the same words.
 
 ## Tools
 
@@ -100,16 +105,18 @@ No tool lets a skill change the running session's model, and only Claude Code le
 | Core, CLI, installer | unit tests (`npm test`) |
 | Viewer | headless Chromium on the demo vault and on a migrated 165-task project |
 | `sw-init` | followed by a fresh agent on a scratch project |
-| `sw-migrate` | followed by a fresh agent on a real 165-task project; an independent parse of the source confirmed every field of every task, all detail text, zero broken links |
+| `sw-migrate` | followed twice by a fresh agent on a real 165-task project; an independent parse of the source confirmed every field of every task, all detail text and zero broken links |
 | `sw-ingest`, `sw-lint`, `sw-explain`, `sw-triage` | followed once by a fresh agent on a copy of the demo vault, then revised |
-| `sw-plan`, `sw-implement` | run end to end on a small code project and on a real task (planned on one model, implemented on another); both skills were rewritten afterwards and the new versions have not been run |
-| Codex CLI 0.153, Copilot CLI 1.0.31 | skills found; a blocked task refused; `sw-plan` run with the generated planner agent (older skill version) |
+| `sw-implement` without a plan | run three times on real tasks with the implementer on a cheaper model; code, tests and repository checks passed each time, the visual checks were not allowed to run |
+| `sw-plan` with `sw-implement` | run end to end once on a real task with an earlier version of both skills |
+| Codex CLI 0.153, Copilot CLI 1.0.31 | skills found; a blocked task refused; `sw-plan` run with the generated planner agent, earlier skill version |
 
 ## Open questions
 
-- Whether the cost rules above cut tokens as intended.
+- Whether the cost rules hold on a project unlike the one they were measured on.
+- The current planner and implementer instructions, including the requirement list, have not been run; neither has `sw-plan` since the planner began writing the plan file itself.
 - Whether the schema block makes agents reach for the skills unprompted.
-- Claude Code: `sw-plan` presenting through plan mode has not been tried.
+- Claude Code: the generated `sw-planner` and `sw-implementer` agents and presenting a plan through plan mode have not been tried; every run so far used the fallback agents.
 - Copilot CLI: whether the `model:` field of a generated agent file is honoured.
 - `sw-visualize` skill text has not been followed by an agent.
 - Plugin manifests (`.claude-plugin`, `.codex-plugin`) validate but have not been installed.

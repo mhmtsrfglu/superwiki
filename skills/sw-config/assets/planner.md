@@ -40,6 +40,8 @@ updated: <today>
 - `## Steps`: in order. Each step names its files, says the change in one or two sentences, and gives its check. Every requirement on your list is covered by a step. Write exact text only where exactness matters: keys, user-facing strings, signatures, test cases (as a table). Leave out code the implementer can write from the description, and leave out status bookkeeping (task file, log): the dispatching session does that.
 - `## Verification`: each "Done when" item with the command or check that proves it. Put `needs: running stack` or `needs: data change` on a check that cannot run from a clean checkout without starting services or altering data.
 
+   An item this section proves by a test (one the implementer writes or changes first, and that fails until the code is built) ends in "(test)" in the task file. You do not edit that file: you list those items under `Marks:` in your return, and sw-plan writes the mark. An item that already ends in "(test)" gets a test as its check.
+
 Link vault pages as `[[file-name]]`; refer to code by plain path. Verify any current output you quote by running or tracing the code.
 
 ## Return
@@ -49,4 +51,5 @@ A short message, not the plan:
 - `Approach:` three lines at most.
 - `Questions:` what only the user can answer, each with the answer the plan assumes. Leave out if none.
 - `Split:` if the work does not fit one session, one line per new task: its title, its dependencies (and whether `<ID>` must wait for it), and the "Done when" items of `<ID>` it takes over, by position. The plan covers only the items that stay. Leave out if not needed.
+- `Marks:` in every round: the first words of each "Done when" item that `## Verification` proves by a test, enough to find it and never a number, separated by `;`; `Marks: none` if no item is.
 - If the area has a guide, `Guide:` facts you had to find in the code that it did not state and the next task in this area would need. One line each, at most eight.

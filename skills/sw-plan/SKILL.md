@@ -42,6 +42,7 @@ Needs the task module (`docs/tasks/`). If it is missing, say so and offer sw-ini
    Called from sw-do, every presentation up to the approval belongs to its one planned stop.
 6. **Record**, after approval:
    - in the plan file, change `status: draft` to `status: approved`: read only its frontmatter (the first lines, up to the closing `---`) and change that line with your edit tool;
+   - in the task's "Done when", the mark: end each item that `Marks:` in the planner's latest return quotes with " (test)", unless it already ends so. Only that return counts, and `Marks: none` marks nothing;
    - in the task's "Notes", the answers given in step 5;
    - in the area guide, if `node docs/.sw/sw.mjs explain <ID>` names one, the planner's `Guide:` lines, one line per fact;
    - in `docs/log.md`, a new entry `## [date] plan | <ID>`, in the layout the log's last entries use.

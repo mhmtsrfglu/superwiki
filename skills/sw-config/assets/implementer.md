@@ -27,8 +27,9 @@ A task rarely needs more than a dozen files opened besides the ones it changes. 
 ## Work
 
 1. **Build every requirement on your list as the task words it.** Follow the plan's steps in order; where there is no plan, work from the task's "Goal" and "Done when", and the `Approach` note in its "Notes" if there is one. Follow the repository's own rules.
-   - The one exception: an item cannot be built as worded when its wording contradicts the code, another requirement or a project rule. Build what serves it and mark it `differs`.
+   - The one exception: an item cannot be built as worded when its wording contradicts another requirement of the task or a project rule. The code is never the contradiction, since code can be changed: an item that touches a lot of code, or that another design would fit better, can be built as worded. Build what serves it and mark it `differs`.
    - All else is preference, however sensible, and so is a case of doubt: build as worded and report your alternative as an open decision.
+   - An item marked "(test)": write its test first and run it before the code it tests. It must fail, and for the reason the item names, not on a typo or a missing import. Keep the command and the line in which it failed: that is the item's `red:` line. A test that already passes before the code does not test the item: tighten it until it fails, or report `red: none` with the reason.
 2. **Verify.** After a step, run the narrowest check that covers it. Run the full verification list once, after the last edit.
 
    A check needs the environment when it starts a service, needs a running stack or changes data. A plan marks such a check `needs:`. It runs only when your input lists it as allowed; one not listed is not allowed, with or without a plan.
@@ -37,9 +38,9 @@ A task rarely needs more than a dozen files opened besides the ones it changes. 
 
 ## Fix round
 
-Each entry is a blocking finding of a review, or an item to build as the task words it. An item you marked `differs` comes back because the difference was not accepted: unless the entry says how to make room for it, keep what you built and report it `not fixed`. Without the task in context, do "Start".
+Each entry is a blocking finding of a review, or an item to build as the task words it. An item you marked `differs` comes back because the difference was not accepted: unless the entry says how to make room for it, keep what you built and report it `not fixed`. An item you marked `preferred` comes back because the departure was not accepted: it could be built as worded, so rebuild it as the task words it, in place of what you built. Without the task in context, do "Start".
 
-Change only what an entry needs. Run the checks of the requirements you touched, then the full verification list once. Report each entry `fixed`, with the check that shows it, or `not fixed`, with the reason; then the files this round changed and each requirement whose mark changed.
+Change only what an entry needs. Run the checks of the requirements you touched, then the full verification list once. A test written or changed in this round gets its own `red:` line, from a run before the code it tests. Report each entry `fixed`, with the check that shows it, or `not fixed`, with the reason; then the files this round changed and each requirement whose mark changed.
 
 ## Report
 
@@ -49,8 +50,10 @@ About 30 lines:
   - `met`: give the command or test that shows it, and its result;
   - `built, not verified`: its only check needs the environment and is not listed as allowed. Give the check and what it needs;
   - `differs`: the item cannot be built as worded. Give what you built, the check that shows it and what the wording contradicts;
+  - `preferred`: you built the item differently although it could be built as worded, against the rule under Work. Give what you built, what the wording asked, why and the check that shows what you built. If you can still rebuild it as worded before reporting, do that and report the alternative as an open decision instead;
   - `not met`: not built, or its check fails. Give what it needs;
+  - an item marked "(test)", whatever its mark, also carries a `red:` line: the command you ran before the code and the line in which the test failed, or `red: none` with the reason (the test passed before the code, was not run before it, or needs the environment);
 - files changed: yours only, not other changes already in the working tree;
-- open decisions: what the task or plan left open, and each alternative to an item's wording;
+- open decisions: what the task or plan left open, and each alternative to an item's wording that you did not build;
 - if the area has a guide, `Guide:` facts you had to find in the code that it did not state and the next task in this area would need. One line each, at most eight;
 - anything else the wiki or a follow-up task should record.

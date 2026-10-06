@@ -35,19 +35,21 @@ Needs the task module (`docs/tasks/`). If it is missing, say so and offer sw-ini
    | small | all of: one area, three "Done when" items or fewer, nothing left open in its notes, the change confined to a few files | sw-implement directly; no plan, no note |
    | medium | everything else: one area, four to six "Done when" items or more than a few files, nothing open | an "Approach" note in "Notes", then sw-implement |
 
-3. **Say the route** in one line before acting: `Route: <class> (<the rubric conditions that decided it>).` Do not wait for an answer.
+3. **Say the route** in one line before acting: `Route: <class> (<the rubric conditions that decided it>).` Do not wait for an answer. When the user has waived the plan's approval, the line says so: `Route: <class>, plan approval waived by the user (<the rubric conditions that decided it>).`
 
-   **Override.** A route the user names wins over the rubric, whether in the invocation ("as small", "with a plan", "no plan") or at any later point. When the override lowers the class, record it in the task's "Notes" as `- Route: <class>, chosen by the user.`
+   **Override.** A route the user names wins over the rubric, whether in the invocation ("as small", "with a plan", "no plan") or at any later point. When the override lowers the class, record it in the task's "Notes" as `- Route: <class>, chosen by the user.` Only a named route lowers the class. A waiver of approval ("without presenting the plan for approval", "no need to approve it") names no route: the class stays what the rubric decided.
 4. **Follow the route.**
    - **Small:** follow sw-implement from its step 1.
    - **Medium:** write one bullet into the task's "Notes", starting `- Approach (sw-do, <date>):`, three to five lines long: the order of the work, which "Done when" items belong together, the constraints the notes set, and how the result is checked. Its sources are the task file and the area guide, if `node docs/.sw/sw.mjs explain <ID>` names one. No planner, no code reading, no plan file, no log entry. Then follow sw-implement from its step 1; its gate accepts `plan: none` with this note.
    - **Large:** follow sw-plan, which skips its own size test when called from here; it clarifies, dispatches the planner, gets the user's approval and records it. That approval is the one planned stop of sw-do. Plan approved: continue with sw-implement in the same run. Plan dropped: stop; the task stays `todo`.
+   - **Large, approval waived by the user:** the planner runs all the same; the waiver removes the stop, not the plan. Follow sw-plan steps 4 to 6 with these differences. Nothing is presented. Each question of the planner gets its assumed answer, unless the task file, a wiki page or a lesson says otherwise (`node docs/.sw/sw.mjs search`), as under sw-run's standing answer, and the answers count as the user's: step 6 runs whole, so the plan is `approved`, and "Notes" gets the answers once, as `- <date>, answered under the user's waiver of approval: ...`. The `plan` log entry gets the body line `Approved under the user's waiver.` A `Split:` the planner proposes is still put to the user, as sw-plan step 5 says: the waiver covers the plan's approval, not the creation of tasks. Then continue with sw-implement in the same run. Its question about checks that need the environment is still asked.
 
 ## Common mistakes
 
 - Restating, shortening or skipping steps of sw-plan or sw-implement. They are followed whole, as written.
 - Reading code or a plan file to classify. The rubric uses the task file only.
 - Asking the user to confirm the route. Say it and go on; the user interrupts if they disagree.
+- Skipping the planner, or lowering the route, because the user waived the plan's approval. A waiver removes the stop, not the plan; only a named route lowers the class.
 - Treating the Approach note as a plan. `check` still says `plan: none`, and the note holds no steps or verification list.
 - Writing a long Approach note, or exploring the code to write it. Past five lines the task is large: use the large route.
 - Implementing after a plan that was not approved, or going on after the user dropped it.

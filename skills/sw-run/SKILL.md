@@ -61,21 +61,21 @@ This skill takes the place of their other steps.
 | sw-plan step 5: the user sees the plan, answers its questions, approves it and any split | nothing is presented. Each question gets the assumed answer, unless the task file, a wiki page or a lesson says otherwise (`sw.mjs search`); the plan and any split are approved under the standing answer. A split's new task joins the queue only if it is in scope |
 | sw-plan step 6: the answers go into "Notes"; the `plan` log entry | the answers go into "Notes" once, as decisions made without the user; the log entry gets the body line `Approved under the run's standing answer.` |
 | sw-implement steps 4 and 6: the user allows checks that need the environment | the standing answer, no question: unattended means fewer questions, not more permission |
-| sw-implement step 6: a `differs` item is the user's call | one fix round, its entry the item in the task's wording |
+| sw-implement step 6: a `differs` or `preferred` item is the user's call | one fix round, its entry the item in the task's wording |
 | sw-implement steps 11 and 12: offers, and the report | offers, open decisions and open findings go into the run's report; the rest is in each task's Summary |
 
 ### Decisions made without the user
 
 Every answer you give in the user's place, recorded where it was made:
 
-- on a task (a planner question answered, a plan or split approved, a `differs` item sent back): in its "Notes" as `- <date>, decided without the user: ...`, and in the report with its id;
+- on a task (a planner question answered, a plan or split approved, a `differs` or `preferred` item sent back): in its "Notes" as `- <date>, decided without the user: ...`, and in the report with its id;
 - for the run (each default in the `Standing answers:` line, working-tree changes left alone): in the report under `run` and nowhere else, even when it later decides something on a task, as a check not allowed does.
 
 ## When to stop
 
 A stop on a task fires once the task is closed (step 6), with its summary and outcome recorded; a summary with an `unverified` or `failed` item takes step 9's `blocked: <n> unverified, <m> failed` row. Then stop and report, also on the last task in scope. Take the next task instead only if agreed and independent of this one.
 
-- A requirement is `not met`, or a fix round reports an entry `not fixed`. A `differs` item not fixed is a difference the user has not decided: `unverified` in the summary.
+- A requirement is `not met`, or a fix round reports an entry `not fixed`. A `differs` or `preferred` item not fixed is a difference the user has not decided: `unverified` in the summary.
 - The review after the second fix round still says `changes needed`.
 - The summary leaves an item `failed` or `unverified`, also one whose check was not allowed: that stop too fires after the summary, never before the work, with the task built and reviewed where required.
 - `lint` reports an error, or an agreed commit or push is refused.

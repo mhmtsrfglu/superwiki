@@ -50,7 +50,7 @@ About 30 lines:
   - `met`: give the command or test that shows it, and its result;
   - `built, not verified`: its only check needs the environment and is not listed as allowed. Give the check and what it needs;
   - `differs`: the item cannot be built as worded. Give what you built, the check that shows it and what the wording contradicts;
-  - `preferred`: you built the item differently although it could be built as worded, against the rule under Work. Give what you built, what the wording asked, why and the check that shows what you built. If you can still rebuild it as worded before reporting, do that and report the alternative as an open decision instead;
+  - `preferred`: you built the item differently although it could be built as worded, against the rule under Work. Give what you built, what the wording asked, why and the check that shows what you built;
   - `not met`: not built, or its check fails. Give what it needs;
   - an item marked "(test)", whatever its mark, also carries a `red:` line: the command you ran before the code and the line in which the test failed, or `red: none` with the reason (the test passed before the code, was not run before it, or needs the environment);
 - files changed: yours only, not other changes already in the working tree;

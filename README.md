@@ -42,7 +42,7 @@ Superwiki follows the LLM Wiki pattern described by Andrej Karpathy: you curate 
 
 ### The tasks
 
-A task is one file with a goal, a "Done when" list and its dependencies. The agent will not start a task whose dependencies are open, and a task is `done` only when every "Done when" item has been checked by a command.
+A task is one file with a goal, a "Done when" list and its dependencies. The agent will not start a task whose dependencies are open. A task is `done` only when every "Done when" item has been checked by a command run in the closing session, one that would have failed if the item did not hold. The evidence is written into the task file, so you can read later how each item was proven.
 
 `index.md` opens with the task list, so you can follow the work without the viewer:
 
@@ -72,7 +72,7 @@ The list is generated from the task files. Do not edit it by hand: change the ta
 ### Built to be cheap for the agent
 
 - **Little to read.** One small index, one file per task, and a script that answers "what is ready?" or "what blocks this?" without the agent reading the vault.
-- **Work in clean contexts.** Planning, implementing and reviewing run in subagents, each on the model you choose. The main session only tracks the task's status, so it stays small.
+- **Work in clean contexts.** Planning, implementing and reviewing run in subagents, each on the model you choose. The main session only tracks the task's status and checks the result, so it stays small.
 - **Cost you can see.** `sw-stats` shows what a session used, per agent; `sw-doctor` shows what every session carries before it starts.
 
 Measured on a real project with 165 tasks, converted from a single markdown index:
@@ -82,6 +82,8 @@ Measured on a real project with 165 tasks, converted from a single markdown inde
 | Read at the start of every session | 197 KB index | 7.7 KB index + 2.7 KB of rules |
 | Read to start one task | the index, then the task's section | one file, 2 KB at the median |
 | Marking a task done | a status cell, plus a ✅ at every reference to it (median 12 places) | one frontmatter line |
+
+A pilot run on 2026-10-06 compared Superwiki with a single-session workflow on two backend tasks of one project, two runs each, with a blind review of the results. On the small task Superwiki cost $2.79 and $3.23 against $4.18 and $4.81. On the medium task the two overlapped, and the review scored quality a tie. Two tasks, one project, one day: read it as a direction. [DESIGN.md](DESIGN.md#the-pilot-of-2026-10-06) has the figures and the limits.
 
 > Status: early. Not every skill has been run in every agent. [DESIGN.md](DESIGN.md#status) lists what has been proven and what has not.
 
@@ -122,6 +124,8 @@ npx superwiki install --project . claude codex   # this project, no question
 
 A skill folder of the same name that Superwiki did not install is kept and reported; `--force` replaces it.
 
+Skills kept in a project are markdown and scripts inside your repository, so the project's own linter and formatter may pick them up. If they report on `.claude/skills` or `.agents/skills`, add those folders to their ignore lists.
+
 ### Cloud agents
 
 A cloud agent (Claude Code on the web, Codex cloud, the GitHub Copilot coding agent) starts from a clone of your repository and never sees your home folder. It has the Superwiki skills only if they are in the repository.
@@ -139,18 +143,19 @@ These folders are the ones each tool's documentation names. Superwiki has not ye
 
 ### Other agents
 
-Agents that load `SKILL.md` folders from `~/.agents/skills` get the skills with the target `global`. For an agent with its own skills folder (Cursor, Gemini CLI, OpenCode and others), copy the `skills/sw-*` folders from a clone into it. Neither has been tested. Expect these limits:
+Agents that load `SKILL.md` folders from `~/.agents/skills` get the skills with the target `global`. For an agent with a skills folder of its own (Cursor, Gemini CLI, OpenCode and others), copy the `skills/sw-*` folders from a clone into it. Neither has been tested. Expect these limits:
 
 - planning, implementing and reviewing run in the main session, not in subagents;
 - `sw-config` cannot set a model per role;
 - `sw-stats` and `sw-doctor` do not work.
 
-### With other skill sets
+### Next to other skill sets
 
-Superwiki works next to planning skill sets such as Superpowers.
+Superwiki can be installed next to a planning skill set that runs in the main session.
 
-- If another skill set answers a bare `/sw-...` command first, name the skill in a sentence: "use the sw-implement skill for T-02".
+- The rules in `AGENTS.md` tell the agent to use the Superwiki skills first for work in the vault. If another skill set still answers a bare `/sw-...` command, name the skill in a sentence: "use the sw-implement skill for T-02".
 - Folders other tools create under `docs/` are left alone. Superwiki only reads and writes `index.md`, `log.md`, `raw/`, `wiki/`, `tasks/` and `plans/`.
+- Your project's own rules can contradict the Superwiki block. A rule that forbids subagents, for instance, makes the main session plan and implement itself, which costs more. Nothing detects such a conflict, so read your rules after `/sw-init`.
 
 ### Update
 
@@ -207,7 +212,7 @@ Commands are shown as typed in Claude Code; in Codex write `$sw-plan` instead of
 
 | Command | What it does |
 | --- | --- |
-| `/sw-do P-15` | take one task from todo to done. A small task goes straight to work; a large one gets a plan you approve first. Without an id, it offers the tasks that can start |
+| `/sw-do P-15` | take one task from todo to done. A small task goes straight to work; a large one gets a plan you approve first. Say "without presenting the plan" to skip the approval: the plan is still written, its assumed answers are recorded as yours, and you are still asked about a proposed split and about checks that start services. Without an id, it offers the tasks that can start |
 | `/sw-run the backend tasks` | work through several tasks in a row without asking at each step. It stops when a task needs you and reports every decision it made in your place |
 | `/sw-explain M-06` | what a task is, why it exists, what it waits on and what it unblocks |
 | `/sw-triage uploads hang at 100% since yesterday` | for a problem: has it happened before, what was learned, likely causes |
@@ -216,9 +221,9 @@ Commands are shown as typed in Claude Code; in Codex write `$sw-plan` instead of
 
 | Command | What it does |
 | --- | --- |
-| `/sw-plan P-15` | have a plan written and approve it. `/sw-plan add CSV export` creates the task first |
-| `/sw-implement P-15` | build the task, have it reviewed if the task asks for a review, and record the result |
-| `/sw-summarize P-15` | check each "Done when" item with a command and write the evidence into the task file |
+| `/sw-plan P-15` | have a plan written and approve it. Items the plan proves by a test are marked "(test)" in the task. `/sw-plan add CSV export` creates the task first |
+| `/sw-implement P-15` | build the task, have it reviewed if the task asks for a review, and record the result. An item built differently from its wording comes back to you to accept or send back |
+| `/sw-summarize P-15` | check each "Done when" item with a command that could have failed and write the evidence into the task file. A "(test)" item also needs its test seen failing before the code, and one deliberate break of the task's central rule; the last command is the project's full check, then `git status` |
 
 ### Keep the wiki
 
@@ -249,6 +254,8 @@ total                                149      -     -  20.9M     95%     43k    
 
 `first` and `peak` are the tokens sent with one request; `sent` is that, summed over every step. Each step sends the whole context again, which is why Superwiki keeps contexts small.
 
+`sw-stats` reads the session of the project it runs in. Run it from the same working directory as the task, or it reports another session.
+
 ### The CLI
 
 The skills call a small script in your project. You can run it yourself, from the project root:
@@ -268,7 +275,7 @@ node docs/.sw/sw.mjs serve --open           # the viewer
 
 ## Contributing
 
-How to build, test and release is in [CONTRIBUTING.md](CONTRIBUTING.md). Why Superwiki works the way it does is in [DESIGN.md](DESIGN.md).
+How to build, test and release is in [CONTRIBUTING.md](CONTRIBUTING.md). Why Superwiki works the way it does is in [DESIGN.md](DESIGN.md). The evals of the skill texts are in [evals/](evals/README.md).
 
 ## License
 

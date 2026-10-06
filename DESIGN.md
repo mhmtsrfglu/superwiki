@@ -4,7 +4,7 @@ This file explains why Superwiki works the way it does. How to install and use i
 
 Superwiki is a set of agent skills that turn a project's `docs/` folder into a wiki the coding agent writes and keeps current, with an optional task tracker. The wiki follows the LLM Wiki pattern described by Andrej Karpathy: raw sources, a wiki the agent owns, and a schema that tells the agent how to maintain it.
 
-Contents: [Principles](#principles) · [The vault](#the-vault) · [How a task runs](#how-a-task-runs) · [Why the work is split](#why-the-work-is-split) · [Running many tasks](#running-many-tasks) · [Measuring a session](#measuring-a-session) · [Across agents](#across-agents) · [Viewer and CLI](#viewer-and-cli) · [Migration](#migration) · [Status](#status)
+Contents: [Principles](#principles) · [The vault](#the-vault) · [How a task runs](#how-a-task-runs) · [Why the work is split](#why-the-work-is-split) · [Running many tasks](#running-many-tasks) · [Measuring a session](#measuring-a-session) · [Across agents](#across-agents) · [Viewer and CLI](#viewer-and-cli) · [Migration](#migration) · [Evals](#evals) · [Status](#status)
 
 ## Principles
 
@@ -14,7 +14,7 @@ Every decision below follows from one observation: what a task costs is what the
 2. **A fact has one home.** A task's status is in its frontmatter only. Counts, blockers and the task list are computed from the task files.
 3. **Scripts answer mechanical questions.** "What is ready?", "what blocks this?" and "is anything broken?" are answered by `docs/.sw/sw.mjs`, not by reading files.
 4. **Work happens in clean contexts.** Planning, implementing and reviewing each run in a subagent that starts empty and ends with the task.
-5. **Done means verified.** A task closes on a command run for each requirement, not on an agent's word.
+5. **Done means verified.** A task closes on a command run for each requirement, one that could have come out the other way, not on an agent's word.
 
 ## The vault
 
@@ -49,6 +49,7 @@ docs/            the vault
 - Statuses: `todo`, `in-progress`, `done`, `cancelled`. Cancelled tasks stay on disk; ids are never reused.
 - `deps` must be done before a task starts. `soft_deps` allow starting but block finishing.
 - Any value in `review` asks for a separate review before the task can be done.
+- A "Done when" item that ends in "(test)" is proven by a test, written first and seen failing before the code. The task template defines the mark; the planner proposes it and `sw-plan` writes it at approval; a user may write it by hand. The mark is what makes the closing summary ask for the test's failing run and a mutation run.
 - Execution order is derived from dependencies plus optional `priority`. There is no stored sequence number or dependency table.
 - A single-project repository uses one area (default `T`); the viewer hides area cards and the area filter then.
 
@@ -58,10 +59,10 @@ A closed task ends with a `## Summary` section, written by `sw-summarize`:
 
 | Part | Holds |
 | --- | --- |
-| `### Plan` | the approach as planned |
-| `### Implementation` | what was built, and each deviation |
+| `### Plan` | the approach as planned, or `No plan` with the Approach note if there was one |
+| `### Implementation` | what was built, and each deviation, including an item rewritten after an accepted difference, with its old wording |
 | `### Changes` | the task's files, taken from git. For uncommitted work: the files that both git and the implementer's reports name, since the working tree can hold other tasks' changes |
-| `### Verification` | one numbered entry per "Done when" item: a bold verdict (`verified`, `unverified` or `failed`), then the command and its result |
+| `### Verification` | one numbered entry per "Done when" item: a bold verdict (`verified`, `unverified` or `failed`), the command, a `falsifies:` line saying how that command would have failed, and the result; a "(test)" item adds the implementer's `red:` line. The part ends with a `Guard run:` line |
 
 An item without an entry counts as unverified. `check` says `can finish: yes` only when every item is verified. `lint` reports `done-unverified` for a `done` task whose summary holds an unverified or failed item. A `done` task with no summary predates the rule and is not a finding.
 
@@ -75,43 +76,51 @@ An item without an entry counts as unverified. `check` says `can finish: yes` on
 
 ### The rules in AGENTS.md
 
-`sw-init` writes a block of rules into `AGENTS.md`. It holds what must apply without any command: read the index first, keep task status, the task list and the log current, and log work that belongs to no task. It also tells the agent which skill to reach for, ahead of other planning or debugging skills. A skill's description alone proved too weak a trigger when another skill set competes for the same words.
+`sw-init` writes a block of rules into `AGENTS.md`. It holds what must apply without any command: read the index first, keep task status, the task list and the log current, and log work that belongs to no task. It also tells the agent which skill to reach for, ahead of other planning or debugging skills. A skill's description alone proved too weak a trigger when another skill set competes for the same words; with the block, the routing eval's agents picked the expected skill for every message that has one, with and without a competing set in context. Where the project's own rules contradict the block, the skills give way: a rule against subagents makes the main session do the roles' work itself. Nothing reports such a conflict (see [Known gaps](#known-gaps)).
 
 ## How a task runs
 
-Three roles do the work, each in its own subagent on the model set with `sw-config`: a planner, an implementer and a reviewer. The main session dispatches them, reads their reports and records the task's status. It reads neither the code nor the plan.
+Three roles do the work, each in its own subagent on the model set with `sw-config`: a planner, an implementer and a reviewer. The main session dispatches them, reads their reports, runs the closing checks and records the task's status. It reads neither the code nor the plan.
 
 ### Three routes
 
-`sw-do` sorts a task from its task file alone.
+`sw-do` sorts a task from its task file alone, taking the first row that matches.
 
 | Size | When | What happens |
 | --- | --- | --- |
-| Small | one area, three "Done when" items or fewer, nothing left open, a few files | the implementer runs straight from the task file |
 | Large | any of: more than six "Done when" items, more than one area, an open question, a required review, or a new format, interface or migration other work will depend on | the planner writes a plan and the user approves it |
+| Small | one area, three "Done when" items or fewer, nothing left open, a few files | the implementer runs straight from the task file |
 | Medium | everything between | an "Approach" note of three to five lines in the task's "Notes", then the implementer |
 
 The reasoning is cost. A plan costs a planner run that reads the code; a note costs a few lines. The note is written without reading code, so it orders the work and names the checks but settles no technical question. Skipping the plan has a price too: questions a planner would have put to the user are decided by the implementer and reported afterwards.
 
+`sw-do` states the route in one `Route:` line and goes on without waiting. A route the user names ("as small", "no plan") overrides the rubric and is recorded in the task's notes when it lowers the class. Only a named route lowers it.
+
+**A waiver of approval is not a waiver of the plan.** "Without presenting the plan for approval" removes the stop, not the planner. The class stays what the rubric decided; on the large route the planner runs, each of its questions gets its assumed answer unless the task file or the wiki says otherwise, and those answers count as the user's: they go into the task's notes, the plan is recorded `approved`, and the log entry says it was approved under the waiver. The `Route:` line names the waiver. Two things stay with the user: a split the planner proposes, since the waiver covers the plan and not the creation of tasks, and the question about checks that need the environment. In the pilot the same waiver made `sw-do` skip the planner in one run of three, and that run was the dearest of the eight.
+
 ### Planning
 
-The planner writes the plan file as `status: draft` and returns a few lines. The main session shows those to the user in a normal message; approval changes the file to `approved`. Plan mode is not used: a reply that agrees to a split or changes an answer needs files written before the plan is shown again.
+The planner writes the plan file as `status: draft` and returns a few lines: the approach, the questions only the user can answer with the answer the plan assumes, a proposed split if the work does not fit one session, and `Marks:`, the items its verification proves by a test. The main session shows the approach, questions and split to the user in a normal message; approval changes the file to `approved` and writes the "(test)" marks into the task. Plan mode is not used: a reply that agrees to a split or changes an answer needs files written before the plan is shown again. `Marks:` comes back in every round and names items by their first words, never by number. A split renumbers the items, and a round that left the line out would otherwise keep stale marks; only the latest return counts.
 
 ### Implementing
 
 - **Reading follows rules.** Locate before opening, open the range and not the file, one example per pattern, trust generated types, batch lookups, never read twice.
-- **The task text decides the work.** The implementer lists every requirement the task states and marks each `met`, `built, not verified`, `not met` or `differs`. A missing or differing item is not done until the user accepts it.
-- **`differs` is narrow.** It is allowed only where an item cannot be built as worded, because the wording contradicts the code, another requirement or a project rule. A mere preference is built as worded and reported as an open decision.
-- **An accepted difference is written into the task.** The "Done when" item is reworded to what was built, and the old wording and the reason go into "Notes", so the reviewer and the summary read one wording. A difference the user does not accept goes back to the implementer.
+- **The task text decides the work.** The implementer lists every requirement the task states and marks each `met`, `built, not verified`, `differs`, `preferred` or `not met`. A `met` carries the command that shows it.
+- **`differs` is narrow.** It is allowed only where an item cannot be built as worded because the wording contradicts another requirement of the task or a project rule. The code is never the contradiction, since code can be changed.
+- **`preferred` records a departure, not a licence.** The rule stays "build as worded". An implementer that built an item another way although it could have been built as worded says so, with what it built, what the wording asked and why. The main session reads no code and cannot tell a sensible alternative from the requirement; without the mark such an item had no honest report, since `differs` needs a contradiction and `met` claims the wording.
+- **Both are the user's call.** The main session shows the wording, what was built and why; for `preferred` the question says the item could have been built as worded. Accepted: the "Done when" item is rewritten to what was built, and the old wording and reason go into "Notes", so the reviewer and the summary read one wording, and the summary names it as a deviation. Not accepted: a fix round with the item in the task's wording; a `preferred` item is rebuilt as worded, a `differs` item comes back `not fixed` unless the entry makes room for it.
+- **A "(test)" item is written test first.** The implementer runs the test before the code; it must fail for the reason the item names. The command and the failing line are the item's `red:` line in the report. A test that passes before the code does not test the item.
 - **The roles do not commit.** They leave their changes in the working tree. Committing belongs to the main session, which records the status too.
 
 ### Checks that need the environment
 
 A check that starts a service, needs a running stack or changes data runs only with the user's yes. A plan marks such a check `needs:`, but the rule lives in the role files: the implementer and the reviewer run one only when their input lists it as allowed. An item whose only check was not allowed is reported `built, not verified`. `sw-implement` then asks the user once whether the check may run and goes on to the review either way. If the check could not run, the summary records the item as `unverified` and the task stays open.
 
+The question is asked also when the plan's approval was waived. Only a standing answer in the user's first message ("the dev server may run") replaces it. In every unattended Superwiki run of the pilot the main session had treated the check as not allowed without asking.
+
 ### Reviewing
 
-A task whose frontmatter has `review:` is reviewed after the implementer's report passes. The reviewer lists what the change claims, tries to break each claim, and classifies what it finds. It sees the change, not the reasoning that produced it, and its instructions forbid editing the repository.
+A task whose frontmatter has `review:` is reviewed after the implementer's report passes. The reviewer lists what the change claims, tries to break each claim, checks whether a test would fail if the claim were false, and classifies what it finds. It sees the change, not the reasoning that produced it, and its instructions forbid editing the repository.
 
 Blocking findings go back as a fix round: to the implementer that did the work where the tool can continue it, otherwise to a fresh one. Each later review is done by a fresh reviewer that is given every file the task changed and the earlier blocking findings; it rechecks those first. After two rounds that still fail, the findings go to the user.
 
@@ -123,13 +132,23 @@ The summary runs in the main session, not in the implementer and not in a fourth
 
 `sw-implement` ends by telling the user to start the next task in a new session. The task is recorded in files, so nothing is lost, and the next task does not pay for this one's history.
 
+### Evidence that can fail
+
+A command per item is not enough: the pilot's summaries all accepted an assertion against a `NOT NULL` column as proof that "every movement is dated". The database enforces that constraint, so the test passes whatever the code does. The closing rules now ask for evidence that could have come out the other way.
+
+- **`falsifies:`.** Each entry that names a command says how that command would have failed if the item did not hold: the exit code, the missing line, the changed count, for this item's rule. A command for which no such line can be written proves nothing, and the item is `unverified` with the reason `the command cannot fail`. `sw-summarize` names three shapes of it: an assertion on a schema constraint, a test of what a mock returns, and a concurrency test whose threads are serialised before the lock.
+- **Text and behaviour.** An item about text is proven by `grep`, `test -f` or `lint`. An item about behaviour, including what an agent following a prompt does, is proven by running the thing; finding the code or text that should cause it proves only that the text is there.
+- **`red:`.** A "(test)" item carries the implementer's line from the run in which its test failed before the code. Without it the test has not been seen to fail, and the item is `unverified`.
+- **One mutation run.** When an item is marked "(test)", the summary breaks the task's central rule on purpose, by removing the line that enforces it or inverting its condition, runs the test, notes which test went red, and restores the code from a saved copy. `git checkout` would also drop the task's uncommitted work. Nothing red means the test does not hold the rule. One run per task, not per item: each took under a minute in the pilot, and one per item would double a summary's time.
+- **The guard run, last.** After every other command, the project's full check (its whole test or build command, with no filter) and the vault's `lint`, then `git status --porcelain` again. A filtered run as the last command can delete generated files and say nothing: in the pilot, one run's final filtered test command deleted the generated contract files, and its claim no longer matched its tree. A file deleted that the task did not delete makes the item that touched it `failed`.
+
 ### Area guides
 
 A guide page per task area (layout, patterns, verification commands, gotchas) is read first where it exists and extended after each task. It is optional: in two measured runs it saved nothing visible, because it held what the previous task had needed and the next task needed something else. It stays for areas where several tasks keep needing the same facts.
 
 ## Why the work is split
 
-The rules above come from session records of two real projects. Each figure is a single run on a different task: read it as direction, not as a number to expect elsewhere.
+The rules above come from session records of real projects. Each figure below is a single run or a pilot: read it as direction, not as a number to expect elsewhere.
 
 ### Three ways of working
 
@@ -168,9 +187,30 @@ Measured on a large monorepo with small tasks, as the context the subagents used
 
 Skipping the plan for small tasks was the largest saving. The reading rules cut context by about a fifth and tool calls by a third on the same task. In that run the cheaper implementation also left out one of the states the task listed, which is why the implementer now reports on every requirement.
 
+### The pilot of 2026-10-06
+
+The first comparison on the same tasks. Two backend tasks of one project, one small and one medium, were each run from the same commit in two arms, Superwiki and a single-session workflow, twice per cell: eight runs. An evaluator checked every result against the task's "Done when" and scope items, and a blind review scored each on four criteria, 0 to 3 each. The summary is in [docs/wiki/benchmark-pilot.md](docs/wiki/benchmark-pilot.md).
+
+| | Superwiki | Single session |
+| --- | --- | --- |
+| Small task, cost | $3.23, $2.79 | $4.81, $4.18 |
+| Medium task, cost | $6.32 (no plan), $5.20 | $5.32, $5.19 |
+| Peak context, all runs | 142k, 151k, 225k, 372k | 217k, 233k, 242k, 262k |
+| Blind review, sum of four scores (0 to 12) | 9, 10, 10, 10 | 10, 9, 9, 9 |
+
+On the small task the arms do not overlap: Superwiki was at least 23% cheaper. On the medium task they overlap. Quality was a tie, and every run passed the evaluator's acceptance. What it does not show: two backend tasks of one project, one operator, one day. Nothing about UI work, nothing about an approval stop in both arms, nothing about a second model mix. The single-session arm ran everything on Opus 5.5 in three of four runs, against the project's rule that implementation runs on Sonnet 5.5, so its token counts are not on the same model mix as Superwiki's.
+
+What it found, and what each finding changed:
+
+| Finding | Closed by |
+| --- | --- |
+| Evidence that cannot fail passed the summary gate, where three of four single-session runs had broken the rule on purpose to see the test go red; and a filtered last command deleted generated files ([Evidence that can fail](#evidence-that-can-fail)) | T-10: `falsifies:`, `red:`, the mutation run, the guard run; T-12: the "(test)" mark they read |
+| A waiver of approval skipped the planner in one run of three, at 372k peak context; the environment question was never asked ([Three routes](#three-routes)) | T-11 |
+| Three runs of the medium task built a lazy expiry where the task said "deleted once expired", and nobody was asked | T-13: the `preferred` mark; one item still open |
+
 ### What every agent starts with
 
-Every agent in the table above began at 59k to 79k tokens before it had read anything, and sent that again with each step: roughly eight of the twenty-one million tokens. Almost none of it was Superwiki's. The vault adds a 2.7 KB block of rules (1.7 KB without the task module). The rest was the user's environment:
+Every agent in the 37-minute task above began at 59k to 79k tokens before it had read anything, and sent that again with each step: roughly eight of the twenty-one million tokens. Almost none of it was Superwiki's. The vault adds a block of rules of about 3 KB (2.7 KB when that task was measured). The rest was the user's environment:
 
 | Part | Tokens | What it was |
 | --- | --- | --- |
@@ -189,10 +229,10 @@ Part of that can be switched off per project. A first attempt took the start fro
 
 `sw-implement` is written for one task with the user present. `sw-run` works through several unattended. Each task goes through the same steps as a single one: `sw-do`'s routes, `sw-plan` for a large task, then `sw-implement` and `sw-summarize`. On top of that `sw-run` adds four things.
 
-- **Standing answers.** What the single-task skills ask along the way is settled once: plan and split approval, which checks that need the environment may run, commit and push, whether to go on when a task stops. The answers are checked against what the project allows before the first task is touched. A message that rules out questions gets the defaults, stated in one `Standing answers:` line.
-- **Decisions in the user's place, written down.** A planner's question answered with its assumed answer, a plan approved, a split accepted, a default applied, a `differs` item sent back: each goes into the task's notes and into the run's report. Unattended means fewer questions, not more permission. A check that starts services or changes data still needs a yes given in advance.
+- **Standing answers.** What the single-task skills ask along the way is settled once: plan and split approval, which checks that need the environment may run, commit and push, whether to go on when a task stops. A question counts as answered only where the user's message speaks to it; the open ones are asked in one question. A message that rules out questions gets the defaults (approve, no such check, no commit, stop), stated in one `Standing answers:` line. Before the first task, the run checks that it can do what was agreed: lint is clean, an agreed commit is not refused, and changes in the tree that belong to no task are named.
+- **Decisions in the user's place, written down.** A planner's question answered with its assumed answer, a plan approved, a split accepted, a `differs` or `preferred` item sent back for one fix round in the task's wording: each goes into the task's notes and into the run's report. Unattended means fewer questions, not more permission. A check that starts services or changes data still needs a yes given in advance.
 - **Closing each task.** The outcome is recorded as for a single task. Then `lint` runs, so a lint error stops the run at the task that caused it, and the task is committed if that was agreed. Without commits the tasks' changes share one working tree, which is why the summary lists only the files that both git and the implementer's reports name.
-- **Stop rules.** The run stops, with the task left in progress, on a requirement that stays unmet, a difference still there after one fix round, a review that fails twice, a summary item that is failed or unverified, a lint error or a refused commit. A check that was not allowed stops it after the summary, not before the work: the task is built, reviewed and summarized, and the item stays `unverified`.
+- **Stop rules.** The run stops, with the task left in progress, on a requirement that stays unmet or a fix-round entry `not fixed`, a review that fails twice, a summary item that is failed or unverified, a lint error, a refused commit or push, or a large task when plans may not be approved without the user. A check that was not allowed stops it after the summary, not before the work: the task is built, reviewed and summarized, and the item stays `unverified`.
 
 The orchestrating session watches its own size as well. After each task it reads its row in `sw.mjs stats` and stops between tasks above 200k tokens; the queue is in the files, so a new session resumes it at no cost. The limit is a first guess, not a measured optimum.
 
@@ -211,7 +251,7 @@ Two commands read the record an agent keeps of its own session. Neither writes a
 | Codex | `~/.codex/sessions/<date>/rollout-*.jsonl`, one file per agent, joined by session id | usage per request; base instructions and the tagged blocks sent before the first request |
 | Copilot CLI | `~/.copilot/session-state/<session>/events.jsonl` | totals per agent, written when the session closes; the system message; tool definitions counted at a usage checkpoint |
 
-- The commands read the session they run in where the tool names it (Claude Code sets its id in the environment), otherwise the project's most recently written one.
+- The commands look for the session among the records of the project they run in: where the tool names it (Claude Code sets its id in the environment) that one, otherwise the project's most recently written one. A task whose session ran in another working directory is therefore not the one reported.
 - `doctor` reports characters of text. A skill cannot run a tool's own context command (`/context`, `/status`), which shows the same parts in tokens; the skill uses those figures when the user pastes them.
 - In Copilot CLI the token figures appear once the session has closed.
 - These formats are not documented by their vendors and can change with a release. The commands then report less; the tests pin the shapes they read.
@@ -247,7 +287,7 @@ No tool lets a skill change the running session's model. Model choice therefore 
 | Codex | `.codex/agents/sw-planner.toml`, `sw-implementer.toml`, `sw-reviewer.toml` |
 | Copilot CLI | `.github/agents/sw-planner.agent.md`, `sw-implementer.agent.md`, `sw-reviewer.agent.md` |
 
-The skills dispatch those agents by name. Where they are missing (a session that began before the files existed, a tool without subagents, a project whose rules forbid them), the skills follow the role's instructions in the main session and say that the configured model and the clean context were not used.
+The skills dispatch those agents by name. Where they are missing (a session that began before the files existed, a tool without subagents, a project whose rules forbid them), the skills follow the role's instructions in the main session and say that the configured model and the clean context were not used. A review done that way is weaker, and the skills say so.
 
 ## Viewer and CLI
 
@@ -268,6 +308,19 @@ Some skills are a single command. `sw-board` and `sw-visualize` exist so that th
 - Everything consumed or archived moves to `docs/legacy/` with its layout and with working links.
 - What is not converted (rules and milestones in the old index, other document folders, instruction files that describe the old index) is listed for the user to decide.
 
+## Evals
+
+The tests cover the scripts. The skills are texts an agent follows, and a text is tested by having an agent follow it. Two evals in [evals/](evals/README.md) do that, with fixed inputs, so they can be repeated after any change to a description or a skill text; each run is a row in `evals/results.md`. Both came from an audit of the skill texts on 2026-10-05, which found the main path sound, the exception paths not, and nothing that measured behaviour.
+
+| Eval | Question | How |
+| --- | --- | --- |
+| Routing | Which skill does an agent pick first for a user's message? | A script builds a probe from the current descriptions and the `AGENTS.md` block; three fresh agents per condition say which skill they would invoke for each of 36 typical first messages; the script scores the answers against an expectation per message. Run without and with a competing skill set's descriptions and session-start text |
+| Dry-run | Where does a fresh reader of the skill texts have to guess? | Fresh agents follow the texts alone through concrete scenarios, one task through `sw-do` and the three roles, or an unattended `sw-run` over three tasks, and report each place they must guess, find two texts that disagree, or reach a case no text covers, with what it could cause |
+
+- **Places, not totals.** A dry-run reader's total varies from 11 to 16 findings on nearly the same text. What is compared is whether a reader still reports something at the places a change was about.
+- **What they do not show.** The routing eval is an agent's statement on one model, not a skill firing in a live session. The dry-run builds nothing, so a clean one does not show that the workflow works end to end.
+- **They close text tasks.** By `sw-summarize`'s own rule, a requirement about what an agent following a prompt does is proven by an agent following it. Each of T-10 to T-13 was closed, or held open, on fresh readers of the chain brief.
+
 ## Status
 
 Superwiki is early. This section says what rests on evidence and what does not.
@@ -281,8 +334,10 @@ Superwiki is early. This section says what rests on evidence and what does not.
 | `sw-init` | followed by a fresh agent on a scratch project |
 | `sw-migrate` | an earlier version followed twice by a fresh agent on a 165-task project, checked by an independent parse of the source. The current version converted a 48-task project with matching counts and a clean lint, run by the session that wrote the skill |
 | `sw-ingest`, `sw-lint`, `sw-explain`, `sw-triage` | followed once by a fresh agent on a copy of the demo vault |
-| `sw-implement` without a plan | run three times on real tasks with the implementer on a cheaper model; code, tests and repository checks passed, the visual checks were not allowed to run |
-| `sw-plan`, `sw-implement` and the review | run end to end once in Claude Code on a real task that required a review: the agents were dispatched by name on their configured models, the reviewer found one blocking defect, the implementer fixed it and the second review passed |
+| `sw-do`, `sw-implement`, `sw-summarize` | run on real tasks in Claude Code many times: M-03, M-04 and the four Superwiki runs of the pilot on one backend project, unattended under a waiver; T-10 to T-13 on this repository, attended, on the small and medium routes. The summaries of T-10 to T-13 carry a `falsifies:` line per item and a guard run |
+| `sw-plan` and the review | run end to end once in Claude Code on a real task that required a review: the agents were dispatched by name on their configured models, the reviewer found one blocking defect, the implementer fixed it and the second review passed. The planner also ran in two of the pilot's runs |
+| `sw-implement` on a cheaper model | three real tasks with the implementer on a cheaper model; code, tests and repository checks passed, the visual checks were not allowed to run |
+| Skill texts after T-10 to T-13 | dry-run: sixteen fresh readers in eight rounds of two (six for T-10, two for T-11, eight for T-12 and T-13 together); routing: 35 of 35 expectations in both conditions, three agents each, agreement 35 and 36 of 36 |
 | `sw.mjs stats`, `sw-stats` | run on real session records of Claude Code 2.1, Codex CLI 0.153 and Copilot CLI 1.0.91. The Copilot totals match the tool's own closing record |
 | `sw.mjs doctor` | run on the same records. For Claude Code the parts agree with the tool's `/context` |
 | `sw.mjs board` | run on two real projects, 48 and 165 tasks; lint clean afterwards |
@@ -290,11 +345,13 @@ Superwiki is early. This section says what rests on evidence and what does not.
 
 ### Not yet proven
 
-Skills that have not been followed by an agent, or not everywhere:
+Skills and rules that have not been followed by an agent, or not everywhere:
 
-- `sw-run` has not been run: how much the orchestrating session grows per task, and whether 200k is the right place to stop, is unknown.
-- The texts of `sw-visualize`, `sw-doctor`, `sw-board`, `sw-summarize` and `sw-do` have not been followed by a fresh agent.
-- Codex and Copilot CLI: `sw-implement`, the review and the current `sw-plan` have not been run there.
+- `sw-run` has not been run as itself; the pilot's unattended runs were `sw-do` under a waiver. How much the orchestrating session grows per task, and whether 200k is the right place to stop, is unknown.
+- The rules added after the pilot are proven as texts, by readers and the routing eval, not by a live run: no task with a "(test)" item has been closed under them, so the `red:` line, the mutation run and the planner's `Marks:` have not been used; the waiver path has not run since T-11 changed it.
+- T-13 is open. Its last dry-run round found one clause about the `preferred` mark that readers took two ways; the clause is now deleted, and the pair of readers that would close the task has not been recorded.
+- The texts of `sw-visualize`, `sw-doctor` and `sw-board` have not been followed by a fresh agent.
+- Codex and Copilot CLI: `sw-do`, `sw-implement`, the review and the current `sw-plan` have not been run there.
 - Copilot CLI: whether the `model:` field of a generated agent file is honoured.
 - Skills kept in the repository: no cloud session has been run. That Claude Code on the web, Codex cloud and the Copilot coding agent load skills committed to `.claude/skills` or `.agents/skills` is known from their documentation only, for Codex cloud partly from a secondary source. `sw-init`'s question about it has not been followed by an agent. The installer's question was checked by hand in a pseudo-terminal; the tests cover the flags and the run without a terminal.
 - Plugin manifests (`.claude-plugin`, `.codex-plugin`) validate but have not been installed.
@@ -302,20 +359,25 @@ Skills that have not been followed by an agent, or not everywhere:
 
 Cost:
 
-- Whether the cost rules hold on projects unlike the two they were measured on.
-- What splitting the work between roles saves on one task run both ways.
+- Whether the pilot's saving on a small task holds beyond two tasks of one project, on UI work, with an approval stop in both arms, or with both arms on the same model mix.
 - Whether a fix after a review is cheaper in the implementer that did the work or in a fresh one.
+- What the mutation run and the guard run add to a summary on a project with a slow full check.
 - Whether listing tools in a generated agent file (`tools:`) keeps a subagent from carrying the skill and tool lists.
 - How to switch an account's connectors off for one project from a file. Only the tool's own `/mcp` panel is known to do it, and its effect on the start has not been measured.
 
 Behaviour:
 
-- Whether the rules in `AGENTS.md` make agents reach for the skills unprompted.
+- Whether the rules in `AGENTS.md` make agents reach for the skills unprompted in a live session. The routing eval shows what agents say they would pick, not what fires.
 - Whether agents keep the task list current. The rule is in `AGENTS.md` and in the skills, and only lint notices when it is not followed.
 - Whether a reviewer told not to edit the repository always complies: its instructions forbid it, its permissions do not.
 
-Known gaps:
+### Known gaps
 
+- `sw.mjs stats` reads the sessions of the project it runs in. A task run from another working directory reports the wrong session.
+- Skills kept in a project are picked up by the project's own lint and format checks unless they are told to ignore the folders. Nothing sets that up.
+- A project's existing rules can contradict the Superwiki block, and nothing detects it. In the pilot, a rule against subagents made the main session plan and implement itself, at a higher cost.
+- Under a waiver, the main session treated a check that needs the environment as not allowed without asking. Fixed by T-11; not yet observed in a live run since.
+- Dry-run places still open: what counts as a requirement beyond "Done when" (F3, with T-06), the command for an item that needs the dev server, the Goal and file of a task created by a split, and "run the full verification list" when there is no plan.
 - Session records: a Copilot session that was resumed closes more than once, and `stats` adds the closing records up; whether each one covers only its own run has not been checked. Codex and Copilot sessions longer than a few steps have not been read. The `doctor` output for Codex and Copilot has not been compared with those tools' own commands.
 - The summary in the viewer's task drawer has not been looked at in a browser; its parsing is unit-tested.
 - Migration leaves links in files outside `docs/` (for example `architecture.md`) pointing at archived files.

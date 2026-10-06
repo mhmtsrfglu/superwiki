@@ -337,7 +337,7 @@ Superwiki is early. This section says what rests on evidence and what does not.
 | `sw-do`, `sw-implement`, `sw-summarize` | run on real tasks in Claude Code many times: M-03, M-04 and the four Superwiki runs of the pilot on one backend project, unattended under a waiver; T-10 to T-13 on this repository, attended, on the small and medium routes. The summaries of T-10 to T-13 carry a `falsifies:` line per item and a guard run |
 | `sw-plan` and the review | run end to end once in Claude Code on a real task that required a review: the agents were dispatched by name on their configured models, the reviewer found one blocking defect, the implementer fixed it and the second review passed. The planner also ran in two of the pilot's runs |
 | `sw-implement` on a cheaper model | three real tasks with the implementer on a cheaper model; code, tests and repository checks passed, the visual checks were not allowed to run |
-| Skill texts after T-10 to T-13 | dry-run: sixteen fresh readers in eight rounds of two (six for T-10, two for T-11, eight for T-12 and T-13 together); routing: 35 of 35 expectations in both conditions, three agents each, agreement 35 and 36 of 36 |
+| Skill texts after T-10 to T-13 | dry-run: eighteen fresh readers in nine rounds of two (six for T-10, two for T-11, ten for T-12 and T-13 together); routing: 35 of 35 expectations in both conditions, three agents each, agreement 35 and 36 of 36 |
 | `sw.mjs stats`, `sw-stats` | run on real session records of Claude Code 2.1, Codex CLI 0.153 and Copilot CLI 1.0.91. The Copilot totals match the tool's own closing record |
 | `sw.mjs doctor` | run on the same records. For Claude Code the parts agree with the tool's `/context` |
 | `sw.mjs board` | run on two real projects, 48 and 165 tasks; lint clean afterwards |
@@ -349,7 +349,6 @@ Skills and rules that have not been followed by an agent, or not everywhere:
 
 - `sw-run` has not been run as itself; the pilot's unattended runs were `sw-do` under a waiver. How much the orchestrating session grows per task, and whether 200k is the right place to stop, is unknown.
 - The rules added after the pilot are proven as texts, by readers and the routing eval, not by a live run: no task with a "(test)" item has been closed under them, so the `red:` line, the mutation run and the planner's `Marks:` have not been used; the waiver path has not run since T-11 changed it.
-- T-13 is open. Its last dry-run round found one clause about the `preferred` mark that readers took two ways; the clause is now deleted, and the pair of readers that would close the task has not been recorded.
 - The texts of `sw-visualize`, `sw-doctor` and `sw-board` have not been followed by a fresh agent.
 - Codex and Copilot CLI: `sw-do`, `sw-implement`, the review and the current `sw-plan` have not been run there.
 - Copilot CLI: whether the `model:` field of a generated agent file is honoured.

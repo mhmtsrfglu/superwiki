@@ -214,6 +214,7 @@ Commands are shown as typed in Claude Code. Codex and Copilot CLI see each skill
 
 | Command | What it does |
 | --- | --- |
+| `/sw:brainstorm offline sync for the mobile app` | think an idea through before it is a task, or stress-test a task's goal and scope (`/sw:brainstorm P-15`): what the vault already records, questions in rounds with a recommended answer each, a written-back understanding you confirm, then the task files with your answers in their notes and the open questions with who answers them. It names the next step per task and starts neither |
 | `/sw:plan-implement P-15` | take one task from todo to done. A small task goes straight to work; a large one gets a plan you approve first. Say "without presenting the plan" to skip the approval: the plan is still written, its assumed answers are recorded as yours, and you are still asked about a proposed split and about checks that start services. Without an id, it offers the tasks that can start |
 | `/sw:autopilot the backend tasks` | work through several tasks in a row without asking at each step. It stops when a task needs you and reports every decision it made in your place |
 | `/sw:explain M-06` | what a task is, why it exists, what it waits on and what it unblocks |

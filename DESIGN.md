@@ -82,6 +82,8 @@ An item without an entry counts as unverified. `check` says `can finish: yes` on
 
 Three roles do the work, each in its own subagent on the model set with `sw:config`: a planner, an implementer and a reviewer. The main session dispatches them, reads their reports, runs the closing checks and records the task's status. It reads neither the code nor the plan.
 
+Before a task exists, or before one that exists is trusted, `sw:brainstorm` settles what the planner cannot: intent and scope. It says what the vault already records on the subject, so a settled decision is not decided again; asks in rounds, every question whose prerequisites are settled at once, numbered, each with a recommended answer that "yes" accepts; looks facts up instead of asking them; writes the understanding back for the user to confirm; and only then writes task files, with the answers in their "Notes" and each open question with the person who can answer it, and a `decision` page when several tasks share a design. The vault is the artifact, so there is no spec file: `sw:plan` takes over from the task file, and the skill names the next step by the small-task rule and starts neither. It is the one skill that creates tasks from a conversation rather than from a split, and it never sets a status.
+
 ### Three routes
 
 `sw:plan-implement` sorts a task from its task file alone, taking the first row that matches.
@@ -92,7 +94,7 @@ Three roles do the work, each in its own subagent on the model set with `sw:conf
 | Small | one area, three "Done when" items or fewer, nothing left open, and the task file names the files that change, three or fewer | the implementer runs straight from the task file |
 | Medium | everything between, including a task whose file does not show how many files change | an "Approach" note of three to five lines in the task's "Notes", then the implementer |
 
-Each condition can be decided from the task file. "Area" has the vault's one meaning, the configured area a task's id prefix names (`areas` in `docs/.sw/config.json`), never a part of the code; in a project with one configured area every task is in one area. The items are counted by `check`'s `done when:` line. "A few files" was dropped because no reader could decide it: a task file that does not name its files is medium at least. The small-task rule is one line, word for word the same in `sw:plan-implement`, `sw:plan` and `sw:implement`, since the latter two must work without `sw:plan-implement` loaded; `test/skills.test.mjs` keeps the three copies equal.
+Each condition can be decided from the task file. "Area" has the vault's one meaning, the configured area a task's id prefix names (`areas` in `docs/.sw/config.json`), never a part of the code; in a project with one configured area every task is in one area. The items are counted by `check`'s `done when:` line. "A few files" was dropped because no reader could decide it: a task file that does not name its files is medium at least. The small-task rule is one line, word for word the same in `sw:plan-implement`, `sw:plan`, `sw:implement` and `sw:brainstorm`, since the latter three must work without `sw:plan-implement` loaded and `sw:brainstorm` names the next step by it; `test/skills.test.mjs` keeps the four copies equal.
 
 The reasoning is cost. A plan costs a planner run that reads the code; a note costs a few lines. The note is written without reading code, so it orders the work and names the checks but settles no technical question. Skipping the plan has a price too: questions a planner would have put to the user are decided by the implementer and reported afterwards.
 
@@ -372,6 +374,7 @@ Skills and rules that have not been followed by an agent, or not everywhere:
 - `sw:autopilot` has not been run as itself; the pilot's unattended runs were `sw:plan-implement` under a waiver. How much the orchestrating session grows per task, and whether 200k is the right place to stop, is unknown.
 - The rules added after the pilot are proven as texts, by readers and the routing eval, not by a live run: no task with a "(test)" item has been closed under them, so the `red:` line, the mutation run and the planner's `Marks:` have not been used; the waiver path has not run since T-11 changed it.
 - The texts of `sw:view`, `sw:doctor` and `sw:index` have not been followed by a fresh agent.
+- `sw:brainstorm` has not been followed by a fresh agent on an idea or on a task: whether the rounds end, whether the written-back understanding is confirmed before anything is written, and whether the task files it writes are what `sw:plan` needs, is known from the text and the routing eval only.
 - `sw:review` has not been followed by a fresh agent; T-08's scenarios cover it.
 - Codex and Copilot CLI: `sw:plan-implement`, `sw:implement`, the review and the current `sw:plan` have not been run there, and the `sw-<name>` copies have not been loaded there since the rename.
 - Copilot CLI: whether the `model:` field of a generated agent file is honoured.

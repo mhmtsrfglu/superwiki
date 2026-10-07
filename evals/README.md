@@ -86,41 +86,53 @@ Compare places, not totals. For each finding id in the brief's `## Places to che
 
 ## End-to-end
 
-What it measures: what an agent in a role does on the exception paths the role files describe, on a small project with a vault, with the result judged by commands rather than by reading. Each scenario in `e2e/scenarios/` plants one situation in a clean copy of the fixture, hands one task to one role, and lists its pass conditions as a table: a search of the agent's report, the vault's own `sw.mjs check` and `lint`, and whether the copy's files changed. The four scenarios:
+What it measures: what the skills do on the exception paths the texts describe, on a small project with a vault, with the result judged by commands rather than by reading. Each scenario in `e2e/scenarios/` plants one situation in a clean copy of the fixture and lists its pass conditions as a table: a search of the saved report, a search of a file in the copy, the vault's own `sw.mjs check` and `lint`, and whether the copy's files changed. A scenario comes in one of two forms. A `Role:` scenario hands one task to one dispatched role, reviewer or implementer, as `sw:implement` would send it; the agent is dispatched by hand. A `Skill:` scenario runs one of the skills of the user's own session, `sw:triage`, `sw:plan`, `sw:plan-implement` or `sw:autopilot`, as a headless `claude -p` session in the copy with the `sw@superwiki` plugin installed, so the skill's own steps, its subagents and the chain of skills it follows are exercised. The eight scenarios:
 
-| Scenario | Role | Situation | Passes when the report |
+| Scenario | Role or skill | Situation | Passes when |
 | --- | --- | --- | --- |
-| `planted-defect` | reviewer | `src/paginate.mjs` drops the last page when the total divides evenly by the page size; the test only tries a total that does not | says `changes needed`, names a blocking finding at `src/paginate.mjs` and its cause; no file changed |
-| `second-review` | reviewer | the same defect, after a fix round that only added a test; the first review's finding comes as `Recheck:` | marks the finding `still open`, not `resolved`; no file changed |
-| `differs-item` | implementer | T-02's first item asks for a CommonJS file in a project whose `AGENTS.md` allows ES modules only | marks `D1` `differs`, not `preferred` |
-| `service-check` | implementer | T-03's first item can only be checked by starting a server; no plan, no `Checks:` block | marks `D1` `built, not verified`, neither `met` nor `not met` |
+| `planted-defect` | reviewer | `src/paginate.mjs` drops the last page when the total divides evenly by the page size; the test only tries a total that does not | the report says `changes needed`, names a blocking finding at `src/paginate.mjs` and its cause; no file changed |
+| `second-review` | reviewer | the same defect, after a fix round that only added a test; the first review's finding comes as `Recheck:` | the report marks the finding `still open`, not `resolved`; no file changed |
+| `differs-item` | implementer | T-02's first item asks for a CommonJS file in a project whose `AGENTS.md` allows ES modules only | the report marks `D1` `differs`, not `preferred` |
+| `service-check` | implementer | T-03's first item can only be checked by starting a server; no plan, no `Checks:` block | the report marks `D1` `built, not verified`, neither `met` nor `not met` |
+| `triage-report` | `sw:triage`, headless | a bug report on the planted defect, with no lesson page in the vault | the report has the skill's headings, names T-01 and says the vault has no record; no file changed |
+| `plan-draft` | `sw:plan`, headless | T-03 is small by the rubric, and the user wants a plan anyway | a draft plan with a verification list is on disk, the task is still `todo` without a `(test)` mark, and the Approach was presented |
+| `route-and-differs` | `sw:plan-implement`, headless | T-02 routes small, and its first item cannot be built as worded | the `Route:` line is said and not large, the item reaches the user as `differs`, the task is `in-progress` without a plan and nothing is accepted on the user's behalf |
+| `autopilot-run` | `sw:autopilot`, headless | T-02 then T-03, questions ruled out, every standing answer at its default | the `Standing answers:` and `Route:` lines are said, the decisions made without the user are on the task and in the report, the usage table is printed; no commit |
 
-What it does not measure: the skills around the roles. The agent gets the role's input directly, as `sw:implement` would send it, so the dispatching skill's own steps (setting the status, choosing the checks, reading the report) are not exercised; `sw:plan-implement` over a whole task is a separate run, decided case by case because of its cost. One model, one tiny project: a pass says the role handled this path here, not that the text is unambiguous, and the dry-run is where ambiguity shows. The reviewer scenarios also report whether the reviewer edited the copy, which the audit left open.
+What it does not measure: the user's reply. A headless session cannot answer a question, so each `Skill:` scenario measures up to the stop where the skill returns to the user: `sw:plan` has presented the draft, `sw:plan-implement` has put the `differs` item to the user, `sw:triage` has made its offers. Only `sw:autopilot` runs to its own end, under its standing answers. What happens after the user answers (an accepted difference, an approved plan, a fix filed from the triage) is not exercised. One model, one tiny project: a pass says the text was followed on this path here, not that it is unambiguous, and the dry-run is where ambiguity shows. The reviewer scenarios also report whether the reviewer edited the copy, which the audit left open.
 
 ### Layout
 
 - `e2e/fixture/`: the project, `items` in `src/items.mjs`, one test, an `AGENTS.md` with one rule (ES modules under `src/`, `.mjs`, named exports only), and a vault with three seeded tasks: T-01 "Paginate the item list" in progress, T-02 "Export the item list as CSV" and T-03 "Serve the items over HTTP" ready. Its `docs/.sw/` and `docs/viewer.html` are not committed; `prepare` creates them with the version of `sw.mjs` in the checkout.
 - `e2e/overlays/<name>/`: files laid over the copy uncommitted, as the task's change: `planted-defect` holds the defective `src/paginate.mjs` and its green test, `second-review` the same with an empty-list case added.
-- `e2e/scenarios/<name>.md`: one scenario each. Header lines `Task:`, `Role:` (`reviewer` or `implementer`), `Overlays:` and `Files:`; `## Run`, how it is run; `## Prompt`, a fenced block with the placeholders `<copy>` (the copy's path) and `<files>` (the `Files:` line); an optional `## Recheck` block, appended to the prompt; `## Pass`, the table `| check | expect |`. A check is `sw <args>`, run as `node docs/.sw/sw.mjs <args>` in the copy, expecting `exit <n>` or a line of its output; `output`, expecting `matches /re/flags` or `lacks /re/flags` against the report; or `tree`, expecting `unchanged`, the copy's files as `prepare` left them. A `|` inside a regular expression is written `\|`.
-- `e2e/e2e.mjs`: `prepare` and `check`. It never calls a model.
+- `e2e/scenarios/<name>.md`: one scenario each. Header lines `Task:`, then `Role:` (`reviewer` or `implementer`) or `Skill:` (`triage`, `plan`, `plan-implement`, `implement`, `verify`, `review` or `autopilot`), one of the two; `Budget:`, the dollars a headless run may spend, with `Skill:` only; `Overlays:` and `Files:`; `## Run`, how it is run; `## Prompt`, a fenced block with the placeholders `<copy>` (the copy's path) and `<files>` (the `Files:` line), which for a `Skill:` scenario starts with the skill's invocation, `/sw:<name>`; an optional `## Recheck` block, appended to the prompt; `## Pass`, the table `| check | expect |`. A check is `sw <args>`, run as `node docs/.sw/sw.mjs <args>` in the copy, expecting `exit <n>` or a line of its output; `output`, expecting `matches /re/flags` or `lacks /re/flags` against the report; `file <path>`, the same against a file under the copy, where a missing file fails `matches` and passes `lacks`; or `tree`, expecting `unchanged`, the copy's files as `prepare` left them. A `|` inside a regular expression is written `\|`.
+- `e2e/e2e.mjs`: `prepare`, `run` and `check`. `prepare` and `check` never call a model; `run` starts the claude CLI.
 
 ### Run it
 
-1. Write the agent files from the current role texts, in the repository root:
+1. For a `Role:` scenario, write the agent files from the current role texts, in the repository root:
 
    ```sh
    node skills/config/scripts/config.mjs sync --tools claude
    ```
 
-   It writes `.claude/agents/sw-reviewer.md` and `sw-implementer.md` from `skills/config/assets/`. They are git-ignored and go stale when a role file changes, so this step runs before every run; `prepare` refuses to run while the file for the scenario's role is missing.
+   It writes `.claude/agents/sw-reviewer.md` and `sw-implementer.md` from `skills/config/assets/`. They are git-ignored and go stale when a role file changes, so this step runs before every run; `prepare` refuses to run while the file for the scenario's role is missing. A `Skill:` scenario skips this step: the agents its session dispatches are written into the copy by `prepare`.
 2. Prepare a clean copy per repetition, in a scratch directory outside the repository:
 
    ```sh
    node evals/e2e/e2e.mjs prepare planted-defect --to <scratch>/planted-defect-1
    ```
 
-   It copies the fixture, gives it a vault (`init.mjs --tasks`), commits everything once, lays the overlays over it uncommitted, and prints `Agent: sw-<role>` and the prompt.
-3. Dispatch one fresh agent of the printed type, with the printed prompt and nothing else, and save its report as a file (`<scratch>/planted-defect-1.txt`). The agent type is the point: it carries the role text and the model set with `sw:config`. Do not use the general-purpose fallback of `sw:implement`'s dispatch table, which would measure a different prompt. A fresh agent means a subagent that has not seen this conversation or another repetition.
+   It copies the fixture, gives it a vault (`init.mjs --tasks`) and the agent files of the checkout's role texts (`config.mjs sync --root <copy> --tools claude`, into the copy's `.claude/agents/`), commits everything once, lays the overlays over it uncommitted, and prints `Agent: sw-<role>` or `Skill: sw:<name>` and the prompt. The copy's `.git/info/exclude` keeps `.claude/settings.local.json`, which a session may write, out of the `tree` check.
+3. Run the agent or the session.
+   - `Role:`: dispatch one fresh agent of the printed type, with the printed prompt and nothing else, and save its report as a file (`<scratch>/planted-defect-1.txt`). The agent type is the point: it carries the role text and the model set with `sw:config`. Do not use the general-purpose fallback of `sw:implement`'s dispatch table, which would measure a different prompt. A fresh agent means a subagent that has not seen this conversation or another repetition.
+   - `Skill:`:
+
+     ```sh
+     node evals/e2e/e2e.mjs run triage-report <scratch>/triage-report-1 --report <scratch>/triage-report-1.txt
+     ```
+
+     It starts `claude -p <prompt> --output-format stream-json --verbose --dangerously-skip-permissions --permission-prompts none --setting-sources user,project --max-budget-usd <budget>` with the copy as its working directory and no stdin: the session edits and runs commands unattended, inside the scratch copy, and stops at the scenario's `Budget:` (`--max-budget-usd <n>` here overrides it; `--claude <bin>` names another binary, as the tests do with a stub). The user settings bring the installed plugin and its skills; the project settings are the copy's own, so the agents are the ones `prepare` wrote. The session's events go to `<report>.jsonl` as they come; afterwards every text block the main session said, in order and without the subagents' texts, is saved as `<report>`, and the model, the number of turns, the cost, the result and the session id are printed. It exits 0 when the session ended in `success`, 1 otherwise with the report still written, 2 on an input error (a `Role:` scenario, an unprepared copy, a missing binary). The session's transcript lands under `~/.claude/projects/` keyed by the copy's path, so `node docs/.sw/sw.mjs usage` in the copy shows which agent types the session used and what each sent.
 4. Check the copy and the report:
 
    ```sh
@@ -133,24 +145,27 @@ A scenario's `## Run` section has the same steps with its own names.
 
 ### Repetitions
 
-`planted-defect` three fresh reviewers at least; its result is the number of repetitions that detected the defect, `<detected> of 3`. The other scenarios one agent at least; their result is `check`'s verdict. A scenario that failed once is worth a second run before a text is changed for it: one agent is the weakest method.
+`planted-defect` three fresh reviewers at least; its result is the number of repetitions that detected the defect, `<detected> of 3`. The other `Role:` scenarios one agent at least; their result is `check`'s verdict. A scenario that failed once is worth a second run before a text is changed for it: one agent is the weakest method. A `Skill:` scenario runs once per decision to run it: each run is a whole session with its subagents, and the rows in `results.md` carry its cost, so a repetition is a choice, not a floor.
 
 ### What a run costs
 
-A run spends real tokens: one agent per repetition reads the task, the vault's output and a few files, and the implementer scenarios build code. Take the cost from the usage table after the run, in the repository root: `node docs/.sw/sw.mjs usage` lists each dispatched agent with its model and the tokens it sent, and the results row records them. Expect the four scenarios with three planted-defect repetitions to take six agents.
+A run spends real tokens: one agent per repetition reads the task, the vault's output and a few files, and the implementer scenarios build code. Take the cost from the usage table after the run: in the repository root for a `Role:` scenario, in the copy for a `Skill:` one, `node docs/.sw/sw.mjs usage` lists each agent with its model and the tokens it sent, and the results row records them. Expect the four `Role:` scenarios with three planted-defect repetitions to take six agents.
+
+A headless run is a session of the account the CLI is logged in with, at the model that account's default sets, and it reports its own cost (`total_cost_usd`) when it ends. Each `Skill:` scenario's `Budget:` is the guard against a session that loops: `triage-report` 3, `plan-draft` 5, `route-and-differs` 8, `autopilot-run` 20 dollars. The first runs, on `claude-opus-5-5`, cost $0.41 (triage, 4 turns, the main session alone), $0.84 (plan, 3 turns, a planner), $0.82 (plan-implement, 7 turns, an implementer) and $1.44 (autopilot, 8 turns, an implementer and its fix round); a session that reaches its budget ends with `result: error_max_budget_usd` and exit 1, and whatever it said before is still the report.
 
 ### When to run
 
-After a change to `reviewer.md` or `implementer.md`, to the dispatch rules of `sw:implement`, or to a scenario, overlay or fixture file: run the scenarios that exercise the changed text. Not per commit, and not for a change to `e2e.mjs` alone: `test/e2e.test.mjs` covers the script with stub reports and needs no agent.
+After a change to `reviewer.md` or `implementer.md`, to the dispatch rules of `sw:implement`, or to a scenario, overlay or fixture file: run the `Role:` scenarios that exercise the changed text. After a change to `sw:triage`, `sw:plan`, `sw:plan-implement` or `sw:autopilot`, to `planner.md`, or to a step of `sw:implement` those skills follow: run the `Skill:` scenario of the changed skill, and `autopilot-run` when the change is in the chain it follows. Not per commit, and not for a change to `e2e.mjs` alone: `test/e2e.test.mjs` covers the script with stub reports and a stub `claude` binary and needs no agent.
 
 ### Read the result
 
 - For `planted-defect`, the count is the result. Two detections of three mean a reviewer that stops at the green test one time in three; read the failed report for where it stopped.
-- For the others, a failed row names what the agent did instead: a `lacks` hit shows the wrong mark, a `tree` failure lists the files a reviewer changed, a `sw` failure shows a vault the agent broke.
-- A pass on every row says nothing about cost: compare the agents' tokens with the last row too.
+- For the others, a failed row names what the agent or the session did instead: a `lacks` hit shows the wrong mark, a `tree` failure lists the files that changed, a `file` failure the state the vault was left in, a `sw` failure a vault the run broke.
+- For a `Skill:` scenario, `<report>.jsonl` holds the whole session, the subagents' turns included: read it for where the skill left its steps when a row failed. A run that stopped at its budget is not a verdict on the skill: raise the budget or read the events for the loop before running again.
+- A pass on every row says nothing about cost: compare the agents' tokens, and a session's `total_cost_usd`, with the last row too.
 
 ## Record a result
 
-Add a row to the table of the eval in `results.md`: the date, the short commit (`git rev-parse --short HEAD`), the condition or brief, the number of repetitions or readers, the result, the places, and notes. For routing, the result is the scorer's `agreement` and `expectations` lines, and the places are the messages under `differs` and those marked unsure. For a dry-run, the result is each reader's total, and the places are the listed findings that were not clean. For the end-to-end eval, one row per scenario: the condition is the scenario and the agent type, the result is `<detected> of 3` for `planted-defect` and `check`'s `passed <n> of <m>` otherwise, the places are the pass rows that failed, and the notes hold the model and the tokens per agent from `sw.mjs usage`.
+Add a row to the table of the eval in `results.md`: the date, the short commit (`git rev-parse --short HEAD`), the condition or brief, the number of repetitions or readers, the result, the places, and notes. For routing, the result is the scorer's `agreement` and `expectations` lines, and the places are the messages under `differs` and those marked unsure. For a dry-run, the result is each reader's total, and the places are the listed findings that were not clean. For the end-to-end eval, one row per scenario: the condition is the scenario and the agent type or `sw:<skill> headless`, the result is `<detected> of 3` for `planted-defect` and `check`'s `passed <n> of <m>` otherwise, the places are the pass rows that failed, and the notes hold the model and the tokens per agent from `sw.mjs usage`; for a headless run also the turns, the `total_cost_usd` `run` printed and the agent types the session used.
 
 Answer files and reports stay out of the repository. The row is the record; if a run is worth keeping in full, file the reports as a source under `docs/raw/`.

@@ -42,6 +42,7 @@ Tasks:
 Skills. Use these without being asked. For work in this vault they come before any other planning, implementing or debugging skill:
 
 {{#tasks}}
+- An idea to think through before it is a task, or a task to stress-test before work starts: `sw:brainstorm`.
 - Planning a task, or the user asks what to work on next: `sw:plan`.
 - Implementing a task: `sw:implement`. A change that needs no plan and touches one or two files may be done directly, under the task rules above.
 - One task from start to done in one command (it decides whether a plan is needed): `sw:plan-implement`.

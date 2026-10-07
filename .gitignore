@@ -6,3 +6,4 @@ docs/
 evals/e2e/fixture/docs/.sw/
 evals/e2e/fixture/docs/viewer.html
 .claude/agents/
+.playwright-mcp/

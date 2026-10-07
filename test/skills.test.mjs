@@ -5,23 +5,25 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 const skillsDir = new URL('../skills/', import.meta.url);
 const skill = name => readFileSync(new URL(`${name}/SKILL.md`, skillsDir), 'utf8');
 
-// The 18 skills, by folder name. The plugin `sw` gives each its name, sw:<name>; a folder named
+// The 19 skills, by folder name. The plugin `sw` gives each its name, sw:<name>; a folder named
 // sw-<name> would show as sw:sw-<name> in a plugin install (DESIGN.md, "Names").
 const SKILLS = [
-  'autopilot', 'config', 'doctor', 'explain', 'implement', 'index', 'ingest', 'init', 'lint',
-  'migrate', 'plan', 'plan-implement', 'review', 'search', 'triage', 'usage', 'verify', 'view',
+  'autopilot', 'brainstorm', 'config', 'doctor', 'explain', 'implement', 'index', 'ingest', 'init',
+  'lint', 'migrate', 'plan', 'plan-implement', 'review', 'search', 'triage', 'usage', 'verify', 'view',
 ];
 
-// sw:plan and sw:implement must work without sw:plan-implement loaded, so each of the three carries
-// the rule that decides whether a task is small. This keeps the three copies from drifting apart.
-test('the small-task rule reads the same in sw:plan-implement, sw:plan and sw:implement', () => {
-  const rules = ['plan-implement', 'plan', 'implement'].map(name => {
+// sw:plan and sw:implement must work without sw:plan-implement loaded, and sw:brainstorm names the
+// next step by the same rule, so each of the four carries the rule that decides whether a task is
+// small. This keeps the four copies from drifting apart.
+test('the small-task rule reads the same in sw:plan-implement, sw:plan, sw:implement and sw:brainstorm', () => {
+  const rules = ['plan-implement', 'plan', 'implement', 'brainstorm'].map(name => {
     const lines = skill(name).split('\n').map(line => line.trim()).filter(line => line.startsWith('A task is small when'));
     assert.equal(lines.length, 1, `${name} states the small-task rule on exactly one line`);
     return lines[0];
   });
   assert.equal(rules[1], rules[0], 'sw:plan states the rule as sw:plan-implement does');
   assert.equal(rules[2], rules[0], 'sw:implement states the rule as sw:plan-implement does');
+  assert.equal(rules[3], rules[0], 'sw:brainstorm states the rule as sw:plan-implement does');
 });
 
 // Every role derives the requirement ids D<n> and N<n> from position; the three role files define

@@ -492,7 +492,7 @@ function snapshotSource() {
     async read() {
       window.SW_DATA = null;
       const d = await loadSnapshot();
-      if (!d) throw new Error('The snapshot file docs/.sw/data.js is gone. Run sw-visualize again, or pick the folder.');
+      if (!d) throw new Error('The snapshot file docs/.sw/data.js is gone. Run sw:view again, or pick the folder.');
       return { files: d.files, name: d.name, config: d.config || {}, generated: d.live ? null : d.generated, live: !!d.live };
     },
   };
@@ -512,7 +512,7 @@ function handleSource(handle) {
       for (const folder of VAULT_FOLDERS) {
         jobs.push(docs.getDirectoryHandle(folder).then(d => walk(d, folder + '/', out), () => {}));
       }
-      // sw-init records the project's name and area names here; a vault without it still loads.
+      // sw:init records the project's name and area names here; a vault without it still loads.
       let config = {};
       jobs.push(docs.getDirectoryHandle('.sw').then(d => d.getFileHandle('config.json')).then(h => h.getFile()).then(f => f.text()).then(t => { config = JSON.parse(t); }).catch(() => {}));
       await Promise.all(jobs);
@@ -591,7 +591,7 @@ async function load() {
     const now = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     const n = vault.tasks.size;
     $('#meta').textContent = `${sourceName ? sourceName + ' · ' : ''}${n ? `${n} task${n === 1 ? '' : 's'} · ` : ''}${sum.wikiPages} wiki page${sum.wikiPages === 1 ? '' : 's'} · ${raw.generated ? `snapshot of ${new Date(raw.generated).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'medium' })}` : `read ${now}`}`;
-    $('#meta').title = raw.generated ? 'Shows the files as they were when sw-visualize last ran. Run it again for a new snapshot, or use "Read live folder" to pick the folder and read it directly.' : '';
+    $('#meta').title = raw.generated ? 'Shows the files as they were when sw:view last ran. Run it again for a new snapshot, or use "Read live folder" to pick the folder and read it directly.' : '';
     renderAll();
     ui.history = ui.history.filter(h => pageByPath.has(h.path));
     if (ui.selected && pageByPath.has(ui.selected)) renderDrawer(); else if (ui.selected) closeDrawer();

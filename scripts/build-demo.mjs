@@ -30,7 +30,7 @@ const DEMO_HEAD = `<title>${TITLE}</title>
 <meta property="og:image:height" content="640">
 <meta name="twitter:card" content="summary_large_image">`;
 
-const viewer = readFileSync(join(root, 'skills/sw-init/assets/viewer.html'), 'utf8');
+const viewer = readFileSync(join(root, 'skills/init/assets/viewer.html'), 'utf8');
 if (!viewer.includes(VIEWER_TITLE)) throw new Error(`the viewer no longer has ${VIEWER_TITLE}; update scripts/build-demo.mjs`);
 
 const data = vaultData(join(root, 'examples/demo/docs'));

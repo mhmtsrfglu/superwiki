@@ -5,13 +5,16 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFil
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-const init = new URL('../skills/sw-init/scripts/init.mjs', import.meta.url).pathname;
+const init = new URL('../skills/init/scripts/init.mjs', import.meta.url).pathname;
 const skillsDir = new URL('../skills', import.meta.url).pathname;
-const skillNames = readdirSync(skillsDir).filter(name => name.startsWith('sw-'));
+// The skills by their bare folder names; a copy in a project is named sw-<name>.
+const skillNames = readdirSync(skillsDir).filter(name => existsSync(join(skillsDir, name, 'SKILL.md')));
 const run = (root, ...args) => execFileSync('node', [init, '--root', root, ...args], { encoding: 'utf8' });
 const sw = (root, ...args) => spawnSync('node', [join(root, 'docs/.sw/sw.mjs'), ...args], { encoding: 'utf8', cwd: root });
 const fresh = () => mkdtempSync(join(tmpdir(), 'sw-init-'));
 const read = (root, path) => readFileSync(join(root, path), 'utf8');
+// What a copy of a skill holds: the source, with the name line rewritten to the copy's folder name.
+const copyOf = name => readFileSync(join(skillsDir, name, 'SKILL.md'), 'utf8').replace(/^name: .*$/m, `name: sw-${name}`);
 
 const EMPTY_BOARD = '<!-- sw:board:start (written by `sw.mjs board`; do not edit) -->\n## Tasks\n\nNo tasks yet.\n<!-- sw:board:end -->';
 
@@ -46,11 +49,14 @@ test('schema block with tasks: wiki, task and skill rules, no template markers',
   assert.match(agents, /`docs\/index\.md`: the open tasks, then the catalog/);
   assert.match(agents, /docs\/tasks\/<ID>\.md/);
   assert.match(agents, /\n\nTasks:\n\n- A task's status/);
-  assert.match(agents, /run `node docs\/\.sw\/sw\.mjs board`\. Never edit that list by hand/);
+  assert.match(agents, /run `node docs\/\.sw\/sw\.mjs index`\. Never edit that list by hand/);
   assert.match(agents, /Work that belongs to no task .* one `change` entry/);
-  assert.match(agents, /Implementing a task: `sw-implement`/);
-  assert.match(agents, /One task from start to done in one command \(it decides whether a plan is needed\): `sw-do`\./);
-  assert.match(agents, /`sw-triage` first/);
+  assert.match(agents, /Implementing a task: `sw:implement`/);
+  assert.match(agents, /One task from start to done in one command \(it decides whether a plan is needed\): `sw:plan-implement`\./);
+  assert.match(agents, /without implementing it: `sw:review`/);
+  assert.match(agents, /`sw:triage` first/);
+  assert.equal(agents.match(/sw-<name>/g).length, 1, 'the Codex and Copilot name is said once');
+  assert.doesNotMatch(agents, /sw-[a-z]/, 'no skill is named in the sw- form');
 });
 
 test('wiki-only vault leaves the task module out', () => {
@@ -60,10 +66,10 @@ test('wiki-only vault leaves the task module out', () => {
   assert.ok(!existsSync(join(root, 'docs/.sw/templates/task.md')));
   assert.doesNotMatch(read(root, 'docs/index.md'), /sw:board|## Tasks/);
   const agents = read(root, 'AGENTS.md');
-  assert.doesNotMatch(agents, /tasks\/<ID>|Tasks:|sw-plan|sw-implement|sw-do|sw-explain|board/);
+  assert.doesNotMatch(agents, /tasks\/<ID>|Tasks:|sw:plan|sw:implement|sw:plan-implement|sw:explain|sw:review|sw\.mjs index/);
   assert.match(agents, /`docs\/index\.md`: catalog, one line per wiki page/);
   assert.match(agents, /sw\.mjs search/);
-  assert.match(agents, /`sw-ingest`/);
+  assert.match(agents, /`sw:ingest`/);
   assert.match(agents, /When you change the project, append one `change` entry/);
 });
 
@@ -97,7 +103,7 @@ test('content that was in docs/ before is left alone and reported', () => {
   writeFileSync(join(root, 'docs/superpowers/plans/x.md'), '[[nowhere]]\n');
   const out = run(root, '--tasks');
   assert.equal(read(root, 'docs/index.md'), `${EMPTY_BOARD}\n\nold index\n`, 'an index that was there keeps its text; the task list goes above it');
-  assert.match(out, /docs\/ already had content \(superpowers\)\. It was left untouched and is outside the vault\. If it holds a task index, sw-migrate converts it\./);
+  assert.match(out, /docs\/ already had content \(superpowers\)\. It was left untouched and is outside the vault\. If it holds a task index, sw:migrate converts it\./);
   assert.equal(sw(root, 'lint').status, 0, 'foreign folders are not linted');
 });
 
@@ -107,7 +113,7 @@ test('after a migration the hint to migrate is not repeated', () => {
   mkdirSync(join(root, 'docs/legacy'), { recursive: true });
   const out = run(root, '--tasks');
   assert.match(out, /already had content \(legacy\)/);
-  assert.doesNotMatch(out, /sw-migrate/);
+  assert.doesNotMatch(out, /sw:migrate/);
 });
 
 test('usage errors exit with 2', () => {
@@ -120,29 +126,33 @@ test('usage errors exit with 2', () => {
   const badAgent = spawnSync('node', [init, '--root', fresh(), '--tasks', '--skills', 'cursor'], { encoding: 'utf8' });
   assert.equal(badAgent.status, 2);
   assert.match(badAgent.stderr, /bad agent "cursor"/);
+  // Claude Code's project install is the plugin, not a copy under .claude/skills.
+  const claude = spawnSync('node', [init, '--root', fresh(), '--tasks', '--skills', 'claude'], { encoding: 'utf8' });
+  assert.equal(claude.status, 2);
+  assert.match(claude.stderr, /npx superwiki install --project \. claude/);
 });
 
-test('--skills copies every skill into the folders the named agents read, marked as installed', () => {
-  const root = fresh();
-  const out = run(root, '--tasks', '--skills', 'claude,codex');
-  for (const folder of ['.claude/skills', '.agents/skills']) {
-    for (const skill of skillNames) {
-      assert.ok(existsSync(join(root, folder, skill, 'SKILL.md')), `${folder}/${skill}`);
-      assert.ok(existsSync(join(root, folder, skill, '.sw-installed')), `${folder}/${skill} marker`);
-    }
-    assert.ok(existsSync(join(root, folder, 'sw-init/scripts/init.mjs')));
-  }
-  assert.deepEqual(JSON.parse(read(root, 'docs/.sw/config.json')).skills, ['claude', 'codex']);
-  assert.match(out, /created {3}\.claude\/skills\/sw-plan\//);
-  assert.match(out, /skills: \.claude\/skills, \.agents\/skills$/m);
-});
-
-test('codex and copilot share one folder, and each skill is reported once', () => {
+test('--skills copies every skill as sw-<name> into the folder Codex and Copilot read, marked as installed', () => {
   const root = fresh();
   const out = run(root, '--tasks', '--skills', 'codex,copilot');
+  for (const name of skillNames) {
+    const folder = join(root, '.agents/skills', `sw-${name}`);
+    assert.equal(readFileSync(join(folder, 'SKILL.md'), 'utf8'), copyOf(name), `sw-${name}`);
+    assert.ok(existsSync(join(folder, '.sw-installed')), `sw-${name} marker`);
+  }
+  assert.ok(existsSync(join(root, '.agents/skills/sw-init/scripts/init.mjs')));
+  assert.ok(!existsSync(join(root, '.claude')));
+  assert.deepEqual(JSON.parse(read(root, 'docs/.sw/config.json')).skills, ['codex', 'copilot']);
+  assert.match(out, /created {3}\.agents\/skills\/sw-plan\//);
+  assert.equal(out.match(/\.agents\/skills\/sw-plan\//g).length, 1, 'the shared folder is reported once');
+  assert.match(out, /skills: \.agents\/skills$/m);
+});
+
+test('all means codex and copilot', () => {
+  const root = fresh();
+  run(root, '--tasks', '--skills', 'all');
   assert.ok(existsSync(join(root, '.agents/skills/sw-plan/SKILL.md')));
   assert.ok(!existsSync(join(root, '.claude')));
-  assert.equal(out.match(/\.agents\/skills\/sw-plan\//g).length, 1);
   assert.deepEqual(JSON.parse(read(root, 'docs/.sw/config.json')).skills, ['codex', 'copilot']);
 });
 
@@ -157,49 +167,68 @@ test('without --skills, and with --no-skills, no skill folder is written', () =>
   }
 });
 
+test('a saved choice of claude, from before the plugin install, is skipped without a word', () => {
+  const root = fresh();
+  run(root, '--tasks');
+  const configPath = join(root, 'docs/.sw/config.json');
+  const config = JSON.parse(read(root, 'docs/.sw/config.json'));
+  config.skills = ['claude'];
+  writeFileSync(configPath, JSON.stringify(config));
+  const out = run(root);
+  assert.ok(!existsSync(join(root, '.claude')));
+  assert.doesNotMatch(out, /claude/);
+  assert.match(out, /skills: not in the repository$/m);
+  assert.deepEqual(JSON.parse(read(root, 'docs/.sw/config.json')).skills, ['claude']);
+});
+
 test('an upgrade with no flags brings the repository copies up to this version', () => {
   const root = fresh();
-  run(root, '--tasks', '--skills', 'claude,codex');
-  writeFileSync(join(root, '.claude/skills/sw-plan/SKILL.md'), 'old');
+  run(root, '--tasks', '--skills', 'codex');
+  writeFileSync(join(root, '.agents/skills/sw-plan/SKILL.md'), 'old');
   const out = run(root);
-  assert.equal(read(root, '.claude/skills/sw-plan/SKILL.md'), readFileSync(join(skillsDir, 'sw-plan/SKILL.md'), 'utf8'));
-  assert.ok(existsSync(join(root, '.claude/skills/sw-plan/.sw-installed')));
-  assert.match(out, /updated {3}\.claude\/skills\/sw-plan\//);
-  assert.match(out, /unchanged \.claude\/skills\/sw-init\//);
-  assert.match(out, /unchanged \.agents\/skills\/sw-plan\//);
-  assert.deepEqual(JSON.parse(read(root, 'docs/.sw/config.json')).skills, ['claude', 'codex']);
+  assert.equal(read(root, '.agents/skills/sw-plan/SKILL.md'), copyOf('plan'));
+  assert.ok(existsSync(join(root, '.agents/skills/sw-plan/.sw-installed')));
+  assert.match(out, /updated {3}\.agents\/skills\/sw-plan\//);
+  assert.match(out, /unchanged \.agents\/skills\/sw-init\//);
+  assert.deepEqual(JSON.parse(read(root, 'docs/.sw/config.json')).skills, ['codex']);
 
   run(root, '--no-skills');
-  assert.ok(existsSync(join(root, '.claude/skills/sw-plan/SKILL.md')), '--no-skills deletes nothing');
-  writeFileSync(join(root, '.claude/skills/sw-plan/SKILL.md'), 'old');
+  assert.ok(existsSync(join(root, '.agents/skills/sw-plan/SKILL.md')), '--no-skills deletes nothing');
+  writeFileSync(join(root, '.agents/skills/sw-plan/SKILL.md'), 'old');
   assert.doesNotMatch(run(root), /skills\/sw-plan/);
-  assert.equal(read(root, '.claude/skills/sw-plan/SKILL.md'), 'old', 'and stops the updates');
+  assert.equal(read(root, '.agents/skills/sw-plan/SKILL.md'), 'old', 'and stops the updates');
 });
 
 test('a skill folder that Superwiki did not install is kept and reported', () => {
   const root = fresh();
-  mkdirSync(join(root, '.claude/skills/sw-plan'), { recursive: true });
-  writeFileSync(join(root, '.claude/skills/sw-plan/SKILL.md'), 'mine');
-  const out = run(root, '--tasks', '--skills', 'claude');
-  assert.equal(read(root, '.claude/skills/sw-plan/SKILL.md'), 'mine');
-  assert.ok(!existsSync(join(root, '.claude/skills/sw-plan/.sw-installed')));
-  assert.match(out, /kept {6}\.claude\/skills\/sw-plan\/ \(not installed by Superwiki\)/);
-  assert.match(out, /created {3}\.claude\/skills\/sw-init\//);
+  mkdirSync(join(root, '.agents/skills/sw-plan'), { recursive: true });
+  writeFileSync(join(root, '.agents/skills/sw-plan/SKILL.md'), 'mine');
+  const out = run(root, '--tasks', '--skills', 'codex');
+  assert.equal(read(root, '.agents/skills/sw-plan/SKILL.md'), 'mine');
+  assert.ok(!existsSync(join(root, '.agents/skills/sw-plan/.sw-installed')));
+  assert.match(out, /kept {6}\.agents\/skills\/sw-plan\/ \(not installed by Superwiki\)/);
+  assert.match(out, /created {3}\.agents\/skills\/sw-init\//);
 });
 
 test('run from the project\'s own copy, init.mjs leaves the skills alone and still saves the choice', () => {
   const root = fresh();
-  run(root, '--tasks', '--skills', 'claude');
-  mkdirSync(join(root, '.agents/skills/sw-plan'), { recursive: true });
-  writeFileSync(join(root, '.agents/skills/sw-plan/.sw-installed'), '');
+  run(root, '--tasks', '--skills', 'codex');
   writeFileSync(join(root, '.agents/skills/sw-plan/SKILL.md'), 'changed');
-  writeFileSync(join(root, '.claude/skills/sw-plan/SKILL.md'), 'changed');
-  const own = join(root, '.claude/skills/sw-init/scripts/init.mjs');
-  const out = execFileSync('node', [own, '--root', root, '--skills', 'claude,codex'], { encoding: 'utf8' });
+  const own = join(root, '.agents/skills/sw-init/scripts/init.mjs');
+  const out = execFileSync('node', [own, '--root', root, '--skills', 'codex,copilot'], { encoding: 'utf8' });
   assert.match(out, /note {6}skills in the repository left alone: init\.mjs runs from the project's own copy/);
-  assert.doesNotMatch(out, /(created|updated|unchanged|kept)\s+\.(claude|agents)\/skills\//);
+  assert.doesNotMatch(out, /(created|updated|unchanged|kept)\s+\.agents\/skills\//);
   assert.equal(read(root, '.agents/skills/sw-plan/SKILL.md'), 'changed');
-  assert.equal(read(root, '.claude/skills/sw-plan/SKILL.md'), 'changed');
-  assert.ok(!existsSync(join(root, '.agents/skills/sw-init')));
-  assert.deepEqual(JSON.parse(read(root, 'docs/.sw/config.json')).skills, ['claude', 'codex']);
+  assert.deepEqual(JSON.parse(read(root, 'docs/.sw/config.json')).skills, ['codex', 'copilot']);
+});
+
+test('run from a copy in another project, init.mjs copies only the sw- folders beside it', () => {
+  const source = fresh();
+  run(source, '--tasks', '--skills', 'codex');
+  mkdirSync(join(source, '.agents/skills/other-skill'), { recursive: true });
+  writeFileSync(join(source, '.agents/skills/other-skill/SKILL.md'), '---\nname: other-skill\n---\n');
+  const root = fresh();
+  execFileSync('node', [join(source, '.agents/skills/sw-init/scripts/init.mjs'), '--root', root, '--tasks', '--skills', 'codex'], { encoding: 'utf8' });
+  assert.equal(read(root, '.agents/skills/sw-plan/SKILL.md'), copyOf('plan'));
+  assert.ok(!existsSync(join(root, '.agents/skills/other-skill')));
 });

@@ -1,139 +1,226 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, existsSync, lstatSync, readFileSync, readlinkSync, mkdirSync, writeFileSync, readdirSync, symlinkSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, readlinkSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
-const script = new URL('../install.sh', import.meta.url).pathname;
 const repo = new URL('..', import.meta.url).pathname.replace(/\/$/, '');
-const skills = readdirSync(join(repo, 'skills')).filter(n => n.startsWith('sw-'));
+const bin = join(repo, 'bin/superwiki.mjs');
+const script = join(repo, 'install.sh');
+// The skills by their bare folder names, and the names their copies carry for Codex and Copilot.
+const names = readdirSync(join(repo, 'skills')).filter(name => existsSync(join(repo, 'skills', name, 'SKILL.md'))).sort();
+const copies = names.map(name => `sw-${name}`);
 const home = () => mkdtempSync(join(tmpdir(), 'sw-home-'));
-const bin = new URL('../bin/superwiki.mjs', import.meta.url).pathname;
-// Run from `cwd`: the folder an install would offer as "this project". Stdin is a pipe, not a terminal.
-const cliIn = (cwd, HOME, ...args) => spawnSync('node', [bin, ...args], { encoding: 'utf8', cwd, env: { ...process.env, HOME } });
-const cli = (HOME, ...args) => cliIn(process.cwd(), HOME, ...args);
 const project = () => mkdtempSync(join(tmpdir(), 'sw-proj-'));
-const run = (HOME, ...args) => spawnSync('bash', [script, ...args], { encoding: 'utf8', env: { ...process.env, HOME, SUPERWIKI_HOME: '' } });
+const read = path => readFileSync(path, 'utf8');
+const nameLine = path => read(path).match(/^name: .*$/m)?.[0];
 
-test('each target links every skill into the folder that agent reads', () => {
+// Stands in for Claude Code's CLI: each call appends its working directory and arguments to a log.
+function claudeStub() {
+  const dir = mkdtempSync(join(tmpdir(), 'sw-claude-'));
+  const log = join(dir, 'calls.log');
+  writeFileSync(join(dir, 'claude'), `#!/bin/sh\nprintf '%s\\n' "$(pwd -P) $*" >> '${log}'\n`, { mode: 0o755 });
+  return {
+    env: { PATH: `${dir}:${process.env.PATH}` },
+    calls: () => (existsSync(log) ? read(log).trim().split('\n') : []),
+  };
+}
+
+// Runs the installer as `npx superwiki` does: stdin is a pipe, not a terminal.
+function cli({ home: HOME = home(), cwd = process.cwd(), env = {} } = {}, ...args) {
+  return spawnSync(process.execPath, [bin, ...args], { encoding: 'utf8', cwd, env: { ...process.env, HOME, ...env } });
+}
+// Runs install.sh as a clone's user does: it links unless --copy is given.
+function sh({ home: HOME = home(), env = {} } = {}, ...args) {
+  return spawnSync('bash', [script, ...args], { encoding: 'utf8', env: { ...process.env, HOME, SUPERWIKI_HOME: '', ...env } });
+}
+
+test('claude: the plugin is installed with Claude Code\'s CLI, at user scope by default', () => {
+  const stub = claudeStub();
   const h = home();
-  const r = run(h, 'all');
+  const r = cli({ home: h, env: stub.env }, 'install', 'claude');
   assert.equal(r.status, 0, r.stderr);
-  for (const dir of ['.claude/skills', '.agents/skills', '.copilot/skills']) {
-    for (const s of skills) assert.equal(readlinkSync(join(h, dir, s)), join(repo, 'skills', s));
+  const cwd = realpathSync(process.cwd());
+  assert.deepEqual(stub.calls(), [
+    `${cwd} plugin marketplace add mhmtsrfglu/superwiki --scope user`,
+    `${cwd} plugin install sw@superwiki --scope user`,
+  ]);
+  assert.match(r.stdout, /claude: the plugin sw@superwiki/);
+  assert.ok(!existsSync(join(h, '.claude')), 'nothing is copied for Claude Code');
+});
+
+test('claude: --project installs at project scope from the project folder; --link adds this clone as the marketplace', () => {
+  const stub = claudeStub();
+  const p = project();
+  const r = cli({ env: stub.env }, 'install', '--project', p, '--link', 'claude');
+  assert.equal(r.status, 0, r.stderr);
+  const real = realpathSync(p);
+  assert.deepEqual(stub.calls(), [
+    `${real} plugin marketplace add ${repo} --scope project`,
+    `${real} plugin install sw@superwiki --scope project`,
+  ]);
+  assert.ok(!existsSync(join(p, '.claude/skills')));
+});
+
+test('claude: uninstall removes the plugin at the same scope', () => {
+  const stub = claudeStub();
+  assert.equal(cli({ env: stub.env }, 'uninstall', 'claude').status, 0);
+  assert.equal(cli({ env: stub.env }, 'uninstall', '--project', project(), 'claude').status, 0);
+  assert.deepEqual(stub.calls().map(call => call.split(' ').slice(1).join(' ')), [
+    'plugin uninstall sw@superwiki --scope user',
+    'plugin uninstall sw@superwiki --scope project',
+  ]);
+});
+
+test('claude: without the claude command on PATH the install fails and says so; other targets still run', () => {
+  const h = home();
+  const r = cli({ home: h, env: { PATH: dirname(process.execPath) } }, 'install', 'claude', 'codex');
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /claude/);
+  assert.ok(existsSync(join(h, '.agents/skills/sw-plan/SKILL.md')));
+});
+
+test('codex, copilot and global get copies named sw-<name>, with the name rewritten and the marker set', () => {
+  const h = home();
+  const r = cli({ home: h }, 'install', 'codex', 'copilot', 'global');
+  assert.equal(r.status, 0, r.stderr);
+  for (const dir of ['.agents/skills', '.copilot/skills']) {
+    names.forEach((name, i) => {
+      const folder = join(h, dir, copies[i]);
+      assert.ok(!lstatSync(folder).isSymbolicLink(), folder);
+      assert.equal(nameLine(join(folder, 'SKILL.md')), `name: ${copies[i]}`);
+      assert.ok(existsSync(join(folder, '.sw-installed')));
+      assert.equal(
+        read(join(folder, 'SKILL.md')).replace(/^name: .*$/m, `name: ${name}`),
+        read(join(repo, 'skills', name, 'SKILL.md')),
+        'only the name line differs from the source',
+      );
+    });
   }
-  const g = home();
-  run(g, 'global');
-  assert.ok(existsSync(join(g, '.agents/skills/sw-init/SKILL.md')));
-  assert.ok(!existsSync(join(g, '.claude')));
+  assert.ok(existsSync(join(h, '.agents/skills/sw-init/scripts/init.mjs')));
+  assert.ok(existsSync(join(h, '.agents/skills/sw-init/assets/sw.mjs')));
+  assert.equal(r.stdout.match(/copied {3}sw-init/g).length, 2, 'codex and global share a folder, written once');
+  assert.ok(!existsSync(join(h, '.claude')));
+
+  assert.equal(cli({ home: h }, 'install', 'codex').status, 0, 're-run replaces its own copies');
+  cli({ home: h }, 'uninstall', 'copilot');
+  assert.ok(!existsSync(join(h, '.copilot/skills/sw-init')));
+  assert.ok(existsSync(join(h, '.agents/skills/sw-init')));
+  assert.match(cli({}, '--version').stdout, /^\d+\.\d+\.\d+/);
 });
 
-test('re-running is safe, a foreign skill of the same name is kept, uninstall removes only ours', () => {
+test('a copy from an earlier version is replaced without --force; a foreign folder is kept, and uninstall removes only ours', () => {
   const h = home();
-  mkdirSync(join(h, '.claude/skills/sw-init'), { recursive: true });
-  writeFileSync(join(h, '.claude/skills/sw-init/SKILL.md'), 'mine');
-  const first = run(h, 'claude');
-  assert.equal(first.status, 1);
-  assert.match(first.stdout, /skipped {2}sw-init/);
-  assert.ok(!lstatSync(join(h, '.claude/skills/sw-init')).isSymbolicLink());
-  assert.ok(lstatSync(join(h, '.claude/skills/sw-plan')).isSymbolicLink());
-  assert.match(run(h, 'claude').stdout, /linked {3}sw-plan/);
-  const un = run(h, '--uninstall', 'claude');
+  mkdirSync(join(h, '.agents/skills/sw-plan'), { recursive: true });
+  writeFileSync(join(h, '.agents/skills/sw-plan/SKILL.md'), 'old');
+  writeFileSync(join(h, '.agents/skills/sw-plan/.sw-installed'), '');
+  mkdirSync(join(h, '.agents/skills/sw-init'), { recursive: true });
+  writeFileSync(join(h, '.agents/skills/sw-init/SKILL.md'), 'mine');
+
+  const r = cli({ home: h }, 'install', 'codex');
+  assert.equal(r.status, 1);
+  assert.match(r.stdout, /copied {3}sw-plan/);
+  assert.match(r.stdout, /skipped {2}sw-init/);
+  assert.equal(nameLine(join(h, '.agents/skills/sw-plan/SKILL.md')), 'name: sw-plan');
+  assert.equal(read(join(h, '.agents/skills/sw-init/SKILL.md')), 'mine');
+
+  const un = cli({ home: h }, 'uninstall', 'codex');
   assert.match(un.stdout, /kept {5}sw-init/);
-  assert.ok(existsSync(join(h, '.claude/skills/sw-init/SKILL.md')));
-  assert.ok(!existsSync(join(h, '.claude/skills/sw-plan')));
-  assert.equal(run(h, '--force', 'claude').status, 0);
-  assert.ok(lstatSync(join(h, '.claude/skills/sw-init')).isSymbolicLink());
+  assert.match(un.stdout, /removed {2}sw-plan/);
+  assert.ok(!existsSync(join(h, '.agents/skills/sw-plan')));
+  assert.ok(existsSync(join(h, '.agents/skills/sw-init/SKILL.md')));
+
+  assert.equal(cli({ home: h }, 'install', '--force', 'codex').status, 0);
+  assert.equal(nameLine(join(h, '.agents/skills/sw-init/SKILL.md')), 'name: sw-init');
 });
 
-test('a link that reaches the repository through another folder counts as ours', () => {
+test('install.sh links every copy to this clone, and the linked file keeps its bare name', () => {
+  const stub = claudeStub();
   const h = home();
-  run(h, 'codex');
-  mkdirSync(join(h, '.claude/skills'), { recursive: true });
-  symlinkSync('../../.agents/skills/sw-init', join(h, '.claude/skills/sw-init'));
-  const r = run(h, 'claude');
+  const r = sh({ home: h, env: stub.env }, 'all');
+  assert.equal(r.status, 0, r.stderr);
+  for (const dir of ['.agents/skills', '.copilot/skills']) {
+    names.forEach((name, i) => assert.equal(readlinkSync(join(h, dir, copies[i])), join(repo, 'skills', name)));
+  }
+  assert.equal(nameLine(join(h, '.agents/skills/sw-plan/SKILL.md')), 'name: plan');
+  assert.equal(stub.calls()[0].split(' ').slice(1).join(' '), `plugin marketplace add ${repo} --scope user`);
+
+  const g = home();
+  sh({ home: g }, 'global');
+  assert.ok(existsSync(join(g, '.agents/skills/sw-init/SKILL.md')));
+  assert.ok(!existsSync(join(g, '.copilot')));
+});
+
+test('re-running is safe, and a link that reaches the clone through another folder counts as ours', () => {
+  const h = home();
+  sh({ home: h }, 'codex');
+  assert.match(sh({ home: h }, 'codex').stdout, /linked {3}sw-plan/);
+  mkdirSync(join(h, '.copilot/skills'), { recursive: true });
+  symlinkSync('../../.agents/skills/sw-init', join(h, '.copilot/skills/sw-init'));
+  const r = sh({ home: h }, 'copilot');
   assert.equal(r.status, 0, r.stdout);
-  assert.equal(readlinkSync(join(h, '.claude/skills/sw-init')), join(repo, 'skills/sw-init'));
+  assert.equal(readlinkSync(join(h, '.copilot/skills/sw-init')), join(repo, 'skills/init'));
 });
 
 test('--project and --copy', () => {
   const h = home();
-  const project = mkdtempSync(join(tmpdir(), 'sw-proj-'));
-  assert.equal(run(h, '--project', project, '--copy', 'claude', 'codex').status, 0);
-  assert.ok(existsSync(join(project, '.claude/skills/sw-init/scripts/init.mjs')));
-  assert.ok(!lstatSync(join(project, '.agents/skills/sw-plan')).isSymbolicLink());
-  assert.ok(!existsSync(join(h, '.claude')));
-  run(h, '--project', project, '--uninstall', 'claude');
-  assert.ok(!existsSync(join(project, '.claude/skills/sw-init')));
+  const p = project();
+  assert.equal(sh({ home: h }, '--project', p, '--copy', 'codex', 'copilot').status, 0);
+  assert.ok(existsSync(join(p, '.agents/skills/sw-init/scripts/init.mjs')));
+  assert.ok(!lstatSync(join(p, '.agents/skills/sw-plan')).isSymbolicLink());
+  assert.ok(!existsSync(join(h, '.agents')));
+  sh({ home: h }, '--project', p, '--uninstall', 'codex');
+  assert.ok(!existsSync(join(p, '.agents/skills/sw-init')));
 });
 
 test('bad input', () => {
-  assert.equal(run(home()).status, 2);
-  assert.equal(cli(home(), 'frobnicate').status, 2);
-  assert.equal(run(home(), 'cursor').status, 2);
-});
-
-test('npx entry point: copies by default, updates its own copies, uninstalls them', () => {
-  const h = home();
-  const first = cli(h, 'install', 'claude', 'global');
-  assert.equal(first.status, 0, first.stderr);
-  assert.match(first.stdout, /copied {3}sw-init/);
-  for (const dir of ['.claude/skills', '.agents/skills']) {
-    assert.ok(!lstatSync(join(h, dir, 'sw-plan')).isSymbolicLink());
-    assert.ok(existsSync(join(h, dir, 'sw-init/scripts/init.mjs')));
-    assert.ok(existsSync(join(h, dir, 'sw-init/assets/sw.mjs')));
-  }
-  assert.equal(cli(h, 'install', 'claude').status, 0, 're-run replaces its own copies');
-  cli(h, 'uninstall', 'claude');
-  assert.ok(!existsSync(join(h, '.claude/skills/sw-init')));
-  assert.ok(existsSync(join(h, '.agents/skills/sw-init')));
-  assert.match(cli(h, '--version').stdout, /^\d+\.\d+\.\d+/);
+  assert.equal(sh().status, 2);
+  assert.equal(cli({}, 'frobnicate').status, 2);
+  assert.equal(sh({}, 'cursor').status, 2);
 });
 
 test('without a terminal nothing is asked and the home folder is used; --global says the same in advance', () => {
   for (const flags of [[], ['--global']]) {
     const h = home();
     const p = project();
-    const r = cliIn(p, h, 'install', ...flags, 'claude');
+    const r = cli({ home: h, cwd: p }, 'install', ...flags, 'codex');
     assert.equal(r.status, 0, r.stderr);
     assert.doesNotMatch(r.stdout, /Where should/);
-    for (const s of skills) assert.ok(existsSync(join(h, '.claude/skills', s, 'SKILL.md')), s);
-    assert.ok(!existsSync(join(p, '.claude')));
+    for (const copy of copies) assert.ok(existsSync(join(h, '.agents/skills', copy, 'SKILL.md')), copy);
+    assert.ok(!existsSync(join(p, '.agents')));
   }
 });
 
 test('--project installs marked copies into the project and nothing into the home folder', () => {
   const h = home();
   const p = project();
-  const r = cli(h, 'install', '--project', p, 'claude', 'codex');
+  const r = cli({ home: h }, 'install', '--project', p, 'codex', 'copilot');
   assert.equal(r.status, 0, r.stderr);
-  for (const dir of ['.claude/skills', '.agents/skills']) {
-    for (const s of skills) {
-      assert.ok(!lstatSync(join(p, dir, s)).isSymbolicLink());
-      assert.ok(existsSync(join(p, dir, s, '.sw-installed')), `${dir}/${s}`);
-    }
+  for (const copy of copies) {
+    assert.ok(!lstatSync(join(p, '.agents/skills', copy)).isSymbolicLink());
+    assert.ok(existsSync(join(p, '.agents/skills', copy, '.sw-installed')), copy);
   }
   assert.deepEqual(readdirSync(h), []);
-  assert.equal(cli(h, 'install', '--global', '--project', p, 'claude').status, 2, 'two places at once');
+  assert.equal(cli({ home: h }, 'install', '--global', '--project', p, 'codex').status, 2, 'two places at once');
 });
 
 test('--link into a project warns that the links stay on this machine', () => {
   const h = home();
-  const linked = cli(h, 'install', '--project', project(), '--link', 'claude');
+  const linked = cli({ home: h }, 'install', '--project', project(), '--link', 'codex');
   assert.equal(linked.status, 0, linked.stderr);
   assert.match(linked.stderr, /links point into this machine/);
-  assert.doesNotMatch(cli(h, 'install', '--link', 'claude').stderr, /links point/);
-  assert.doesNotMatch(cli(h, 'install', '--project', project(), 'claude').stderr, /links point/);
+  assert.doesNotMatch(cli({ home: h }, 'install', '--link', 'codex').stderr, /links point/);
+  assert.doesNotMatch(cli({ home: h }, 'install', '--project', project(), 'codex').stderr, /links point/);
 });
 
 test('a foreign skill of the same name in a project is kept and reported', () => {
   const p = project();
-  mkdirSync(join(p, '.claude/skills/sw-init'), { recursive: true });
-  writeFileSync(join(p, '.claude/skills/sw-init/SKILL.md'), 'mine');
-  const r = cli(home(), 'install', '--project', p, 'claude');
+  mkdirSync(join(p, '.agents/skills/sw-init'), { recursive: true });
+  writeFileSync(join(p, '.agents/skills/sw-init/SKILL.md'), 'mine');
+  const r = cli({}, 'install', '--project', p, 'codex');
   assert.equal(r.status, 1);
   assert.match(r.stdout, /skipped {2}sw-init/);
-  assert.equal(readFileSync(join(p, '.claude/skills/sw-init/SKILL.md'), 'utf8'), 'mine');
-  assert.ok(existsSync(join(p, '.claude/skills/sw-plan/.sw-installed')));
+  assert.equal(read(join(p, '.agents/skills/sw-init/SKILL.md')), 'mine');
+  assert.ok(existsSync(join(p, '.agents/skills/sw-plan/.sw-installed')));
 });

@@ -1,8 +1,8 @@
 # Dry-run: chain brief
 
-Source: the chain brief in appendix B of [the audit source](../../docs/raw/2026-10-05-prompt-quality-audit.md), made at commit `23c12e3`. Two changes from the audit: scenario 1 says why the implementer builds an item differently (the item contradicts the existing code), and scenario 3 is new, the same case where the implementer merely prefers another approach.
+Source: the chain brief in appendix B of [the audit source](../../docs/raw/2026-10-05-prompt-quality-audit.md), made at commit `23c12e3`. Three changes from the audit: scenario 1 says why the implementer builds an item differently (the item contradicts the existing code), scenario 3 is new, the same case where the implementer merely prefers another approach, and the skills carry the names they have had since T-14: `sw:<name>`, with the audit's `do` now `sw:plan-implement` and its `summarize` now `sw:verify`.
 
-The brief follows one task through `sw-do` and the three roles it dispatches. Give the prompt below to a fresh agent in the root of this repository, copied whole, and nothing else.
+The brief follows one task through `sw:plan-implement` and the three roles it dispatches. Give the prompt below to a fresh agent in the root of this repository, copied whole, and nothing else.
 
 ## Prompt
 
@@ -11,11 +11,11 @@ I maintain a set of agent skills (prompt files) and want a fresh reader to dry-r
 
 Do not read DESIGN.md, README.md or the source code: an agent following a skill does not have them, and I want to know what the skill texts alone leave open.
 
-Read these files in full: `skills/sw-do/SKILL.md`, `skills/sw-plan/SKILL.md`, `skills/sw-implement/SKILL.md`, `skills/sw-summarize/SKILL.md`; `skills/sw-config/assets/planner.md`, `skills/sw-config/assets/implementer.md`, `skills/sw-config/assets/reviewer.md`; `skills/sw-init/assets/templates/task.md` and `skills/sw-init/assets/templates/plan.md`; `AGENTS.md`. You may run `node docs/.sw/sw.mjs check <an existing id>` and `node docs/.sw/sw.mjs explain <the same id>` once each, to see the output the skills refer to. Walk each scenario role by role: the main session, then each subagent it would dispatch, reading that role's file as the subagent would.
+Read these files in full: `skills/plan-implement/SKILL.md`, `skills/plan/SKILL.md`, `skills/implement/SKILL.md`, `skills/verify/SKILL.md`; `skills/config/assets/planner.md`, `skills/config/assets/implementer.md`, `skills/config/assets/reviewer.md`; `skills/init/assets/templates/task.md` and `skills/init/assets/templates/plan.md`; `AGENTS.md`. The skills are invoked as `sw:<folder name>`: `sw:plan-implement`, `sw:plan`, `sw:implement`, `sw:verify`. You may run `node docs/.sw/sw.mjs check <an existing id>` and `node docs/.sw/sw.mjs explain <the same id>` once each, to see the output the skills refer to. Walk each scenario role by role: the main session, then each subagent it would dispatch, reading that role's file as the subagent would.
 
-Scenario 1. The user types "sw-do T-10". T-10 exists, status todo, no deps, `review:` empty, no plan. It has five "Done when" items, all in one area, nothing open in its notes. One of the five items can only be checked by starting the project's dev server and looking at a page. During the work the implementer finds that one item cannot be built as the task words it, because it contradicts a project rule; it builds the item differently and says so. The user, when asked, accepts that difference.
+Scenario 1. The user types "sw:plan-implement T-10". T-10 exists, status todo, no deps, `review:` empty, no plan. It has five "Done when" items, all in one area, nothing open in its notes. One of the five items can only be checked by starting the project's dev server and looking at a page. During the work the implementer finds that one item cannot be built as the task words it, because it contradicts a project rule; it builds the item differently and says so. The user, when asked, accepts that difference.
 
-Scenario 2. The user types "sw-do T-11". T-11 exists, status todo, `review: required`, eight "Done when" items, no plan. The planner returns an approach, one question with an assumed answer, and a proposal to split the work into two tasks. The user gives a different answer to the question than the planner assumed, agrees to the split, and approves the revised plan. The implementer reports everything met. The reviewer returns `changes needed` with one blocking finding located in file A. The implementer's fix changes only file B. The review is run again.
+Scenario 2. The user types "sw:plan-implement T-11". T-11 exists, status todo, `review: required`, eight "Done when" items, no plan. The planner returns an approach, one question with an assumed answer, and a proposal to split the work into two tasks. The user gives a different answer to the question than the planner assumed, agrees to the split, and approves the revised plan. The implementer reports everything met. The reviewer returns `changes needed` with one blocking finding located in file A. The implementer's fix changes only file B. The review is run again.
 
 Scenario 3. The same as scenario 1, with one difference: the item the implementer builds differently could be built as the task words it. The implementer merely prefers another approach, for a sensible reason.
 
@@ -34,7 +34,7 @@ Not sent to the agent. Read each report at these places: a finding there means t
 
 | Finding | What the reader must not have to guess there | Closed by |
 | --- | --- | --- |
-| F1 | what "more than one area" means in `sw-do`: the id prefix or a part of the code | T-06 |
+| F1 | what "more than one area" means in `sw:plan-implement`: the id prefix or a part of the code | T-06 |
 | F2 | on a task without a plan, who asks before a check that starts the dev server runs | T-03 |
 | F3 | what counts as a requirement beyond the "Done when" items | T-06 |
 | F4 | when the implementer may build an item differently: only when it cannot be built as worded (scenario 1), or also for a better idea (scenario 3) | T-03 |

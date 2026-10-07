@@ -3,7 +3,7 @@
 Requires Node 18 or newer. There are no dependencies to install.
 
 ```bash
-npm test       # builds skills/sw-init/assets/sw.mjs and viewer.html, then runs the tests
+npm test       # builds skills/init/assets/sw.mjs and viewer.html, then runs the tests
 ```
 
 ## Where the code is
@@ -20,13 +20,13 @@ Edit the sources in `src/`:
 | `src/cli.js` | the commands |
 | `src/viewer.html` | the viewer |
 
-`scripts/build.mjs` bundles them into `skills/sw-init/assets/sw.mjs` and `skills/sw-init/assets/viewer.html`. Those two files are generated: do not edit them.
+`scripts/build.mjs` bundles them into `skills/init/assets/sw.mjs` and `skills/init/assets/viewer.html`. Those two files are generated: do not edit them.
 
 The rest:
 
 | Path | What it is |
 | --- | --- |
-| `skills/sw-*/` | the skills: a `SKILL.md` each, some with `scripts/` and `assets/` |
+| `skills/<name>/` | the skills: a `SKILL.md` each, some with `scripts/` and `assets/`. The plugin `sw` (`.claude-plugin/`) names them `sw:<name>` |
 | `bin/superwiki.mjs` | the installer behind `npx superwiki`; `install.sh` wraps it for a clone |
 | `test/` | the tests, run with `node --test` |
 | `evals/` | checks of the skill texts; see `evals/README.md` |

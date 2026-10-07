@@ -21,9 +21,9 @@ const HELP = `sw <command> [--docs <dir>] [--json]
   explain <ID>    a task's dependencies, what it blocks and unblocks, its plan and linked pages
   search <words>  pages and log entries that mention the words, best match first
   next-id <AREA>  next free task id for an area (numbers are never reused)
-  board           rewrite the task list in docs/index.md from the task files
+  index           rewrite the task list in docs/index.md from the task files
   lint            structural checks; exit code 1 on errors
-  stats           what the agent session here has cost so far: steps, context and tokens per agent
+  usage           what the agent session here has cost so far: steps, context and tokens per agent
   doctor          what that session carried before it read anything: rule files, skill and tool lists
                   both take ${SESSION_FLAGS} to look at another session of this project
   serve [--open]  start (or reuse) a local viewer at http://127.0.0.1:<port>/ that reads the files live
@@ -123,7 +123,7 @@ function check(ctx) {
   if (t.error) return { error: t.error };
   const openSoftDeps = t.openSoftDeps.filter(id => taskOf(ctx.vault, id));
   const canStart = t.status === 'todo' && !t.openDeps.length;
-  // Finishing needs a closing summary in which every "Done when" item is verified (sw-summarize).
+  // Finishing needs a closing summary in which every "Done when" item is verified (sw:verify).
   const canFinish = !t.openDeps.length && !t.openSoftDeps.length && !!t.summary?.complete;
   const closing = t.summary && { items: t.summary.items, verified: t.summary.verified, unverified: t.summary.unverified, failed: t.summary.failed, complete: t.summary.complete };
   const verdicts = closing && ['verified', 'unverified', 'failed'].filter(verdict => closing[verdict]).map(verdict => `${closing[verdict]} ${verdict}`).join(', ');
@@ -246,10 +246,10 @@ function nextIdCommand({ vault, args }) {
 }
 
 // The task list in index.md is a view of the task files; this writes it again from them.
-function boardCommand({ docs, vault }) {
-  if (!existsSync(join(docs, 'tasks'))) return { error: 'this vault has no task module (docs/tasks); sw-init --tasks adds it', code: 1 };
+function indexCommand({ docs, vault }) {
+  if (!existsSync(join(docs, 'tasks'))) return { error: 'this vault has no task module (docs/tasks); sw:init --tasks adds it', code: 1 };
   const path = join(docs, 'index.md');
-  if (!existsSync(path)) return { error: 'docs/index.md is missing; run sw-init', code: 1 };
+  if (!existsSync(path)) return { error: 'docs/index.md is missing; run sw:init', code: 1 };
   const before = readFileSync(path, 'utf8');
   const after = indexWithBoard(before, taskBoard(vault));
   const changed = after !== before;
@@ -257,7 +257,7 @@ function boardCommand({ docs, vault }) {
   const { total } = summary(vault);
   return {
     data: { changed, ready: total.ready, inProgress: total.progress, blocked: total.blocked, done: total.done },
-    text: `board: docs/index.md ${changed ? 'updated' : 'unchanged'}  ready ${total.ready}  in-progress ${total.progress}  blocked ${total.blocked}  done ${total.done}`,
+    text: `index: docs/index.md ${changed ? 'updated' : 'unchanged'}  ready ${total.ready}  in-progress ${total.progress}  blocked ${total.blocked}  done ${total.done}`,
   };
 }
 
@@ -294,8 +294,8 @@ function sessionArg(command, { docs, flags }) {
   return session || { error: `no ${flags.tool || 'agent'} session record found for ${root}`, code: 1 };
 }
 
-function statsCommand(ctx) {
-  const session = sessionArg('stats', ctx);
+function usageCommand(ctx) {
+  const session = sessionArg('usage', ctx);
   if (session.error) return session;
   const stats = sessionStats(session);
   return { data: stats, text: formatStats(stats) };
@@ -348,7 +348,7 @@ function runServer(docs) {
     const viewer = join(docs, 'viewer.html');
     if (path === '/' || path === '/viewer.html') {
       if (existsSync(viewer)) send('text/html', readFileSync(viewer));
-      else res.writeHead(404).end('docs/viewer.html is missing; run sw-init');
+      else res.writeHead(404).end('docs/viewer.html is missing; run sw:init');
     } else if (path === '/.sw/data.js') {
       send('text/javascript', dataScript({ ...vaultData(docs), live: true }));
     } else if (path === '/.sw/ping') {
@@ -406,13 +406,17 @@ const COMMANDS = {
   explain: { run: explain, needsVault: true },
   search: { run: searchCommand, needsVault: true },
   'next-id': { run: nextIdCommand, needsVault: true },
-  board: { run: boardCommand, needsVault: true },
+  index: { run: indexCommand, needsVault: true },
   lint: { run: lintCommand, needsVault: true },
-  stats: { run: statsCommand, needsVault: false },
+  usage: { run: usageCommand, needsVault: false },
   doctor: { run: doctorCommand, needsVault: false },
   snapshot: { run: snapshot, needsVault: false },
   serve: { run: serve, needsVault: false },
 };
+// The names `index` and `usage` had before the skills were renamed sw:index and sw:usage; kept so
+// that older skill texts and scripts keep working. The help lists the new names only.
+COMMANDS.board = COMMANDS.index;
+COMMANDS.stats = COMMANDS.usage;
 
 // Flags that are on or off, and flags that take the next argument as their value.
 const SWITCHES = ['json', 'open', 'foreground'];
@@ -451,7 +455,7 @@ async function main(argv) {
   }
   const docs = docsDir(flags);
   if (!existsSync(docs)) {
-    console.error(`no docs folder at ${docs}; run sw-init or pass --docs`);
+    console.error(`no docs folder at ${docs}; run sw:init or pass --docs`);
     return 2;
   }
   const result = await entry.run({ docs, args, flags, vault: entry.needsVault ? loadVault(docs) : null });

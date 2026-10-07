@@ -29,7 +29,6 @@
   "files": [
     "bin",
     "skills",
-    "commands",
     ".claude-plugin",
     ".codex-plugin",
     "install.sh"

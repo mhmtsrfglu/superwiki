@@ -17,7 +17,7 @@ Requires Node 18 or newer.
 npx superwiki install claude        # or: codex, copilot, all
 ```
 
-Start a new agent session in your project and run `/sw-init`. It sets up `docs/` and asks whether you want the task tracker. From then on, ask for what you need in plain words, or use a [command](#use).
+Start a new agent session in your project and run `/sw:init`. It sets up `docs/` and asks whether you want the task tracker. From then on, ask for what you need in plain words, or use a [command](#use).
 
 ## What you get
 
@@ -32,7 +32,7 @@ docs/
   viewer.html    the task board and the wiki in a browser
 ```
 
-`sw-init` also adds a short block of rules to `AGENTS.md`, so the agent maintains the vault in every session, with or without a command.
+`sw:init` also adds a short block of rules to `AGENTS.md`, so the agent maintains the vault in every session, with or without a command.
 
 Everything is plain markdown. `docs/` keeps working as an Obsidian vault without Superwiki.
 
@@ -67,13 +67,13 @@ ready 9 · in progress 1 · blocked 18 · done 20
 **Done (20)** [[B-01]] [[B-02]] [[B-03]] ...
 ```
 
-The list is generated from the task files. Do not edit it by hand: change the task file, and the agent (or `/sw-board`) rewrites the list.
+The list is generated from the task files. Do not edit it by hand: change the task file, and the agent (or `/sw:index`) rewrites the list.
 
 ### Built to be cheap for the agent
 
 - **Little to read.** One small index, one file per task, and a script that answers "what is ready?" or "what blocks this?" without the agent reading the vault.
 - **Work in clean contexts.** Planning, implementing and reviewing run in subagents, each on the model you choose. The main session only tracks the task's status and checks the result, so it stays small.
-- **Cost you can see.** `sw-stats` shows what a session used, per agent; `sw-doctor` shows what every session carries before it starts.
+- **Cost you can see.** `sw:usage` shows what a session used, per agent; `sw:doctor` shows what every session carries before it starts.
 
 Measured on a real project with 165 tasks, converted from a single markdown index:
 
@@ -93,12 +93,14 @@ A pilot run on 2026-10-06 compared Superwiki with a single-session workflow on t
 npx superwiki install <target>...
 ```
 
-| Target | Agent | Invoke a skill with |
-| --- | --- | --- |
-| `claude` | Claude Code | `/sw-init` |
-| `codex` | Codex CLI | `$sw-init`, or "use the sw-init skill" |
-| `copilot` | GitHub Copilot CLI | `/sw-init`, or "use the sw-init skill" |
-| `all` | the three above | |
+| Target | Agent | What is installed | Invoke a skill with |
+| --- | --- | --- | --- |
+| `claude` | Claude Code | the plugin `sw@superwiki`, through `claude plugin install` | `/sw:init` |
+| `codex` | Codex CLI | a copy of each skill | `$sw-<name>`, or the skill named in a sentence |
+| `copilot` | GitHub Copilot CLI | a copy of each skill | `/sw-<name>`, or the skill named in a sentence |
+| `all` | the three above | | |
+
+The skills are named `sw:<name>`: `sw:plan`, `sw:implement`, `sw:plan-implement`. `sw:` is Claude Code's namespace for the plugin. Codex and Copilot CLI have no namespace, so there each skill is a copy named `sw-<name>`, the same skill with a hyphen in place of the colon.
 
 Start a new agent session after installing: a running session does not pick up new skills.
 
@@ -118,44 +120,44 @@ npx superwiki install --project . claude codex   # this project, no question
 
 | Target | In your home folder | In a project |
 | --- | --- | --- |
-| `claude` | `~/.claude/skills` | `.claude/skills` |
+| `claude` | the plugin at user scope (`~/.claude/settings.json`) | the plugin at project scope (`.claude/settings.json`) |
 | `codex` | `~/.agents/skills` | `.agents/skills` |
 | `copilot` | `~/.copilot/skills` | `.agents/skills` |
 
-A skill folder of the same name that Superwiki did not install is kept and reported; `--force` replaces it.
+For Claude Code the installer runs `claude plugin marketplace add` and `claude plugin install sw@superwiki` with the matching `--scope`; it needs the `claude` command on your PATH. A skill folder of the same name that Superwiki did not install is kept and reported; `--force` replaces it.
 
-Skills kept in a project are markdown and scripts inside your repository, so the project's own linter and formatter may pick them up. If they report on `.claude/skills` or `.agents/skills`, add those folders to their ignore lists.
+Skills kept in a project are markdown and scripts inside your repository, so the project's own linter and formatter may pick them up. If they report on `.agents/skills`, add that folder to their ignore lists.
 
 ### Cloud agents
 
 A cloud agent (Claude Code on the web, Codex cloud, the GitHub Copilot coding agent) starts from a clone of your repository and never sees your home folder. It has the Superwiki skills only if they are in the repository.
 
-1. Put the skills in the project. Either answer "this project" in the installer (`npx superwiki install --project . claude codex`), or, on a new vault, say yes when `/sw-init` asks whether to keep the skills in the repository.
-2. Commit and push `.claude/skills` and `.agents/skills`.
+1. Put the skills in the project: `npx superwiki install --project . claude codex`, or answer "this project" in the installer. On a new vault, `/sw:init` also asks whether to keep the Codex and Copilot copies in the repository.
+2. Commit and push `.claude/settings.json` and `.agents/skills`.
 
 | Cloud agent | Target | Reads the skills from |
 | --- | --- | --- |
-| Claude Code on the web | `claude` | `.claude/skills` |
+| Claude Code on the web | `claude` | the plugin named in `.claude/settings.json` |
 | Codex cloud | `codex` | `.agents/skills` |
 | GitHub Copilot coding agent | `copilot` | `.agents/skills` |
 
-These folders are the ones each tool's documentation names. Superwiki has not yet been run in a cloud session.
+These places are the ones each tool's documentation names. Superwiki has not yet been run in a cloud session.
 
 ### Other agents
 
-Agents that load `SKILL.md` folders from `~/.agents/skills` get the skills with the target `global`. For an agent with a skills folder of its own (Cursor, Gemini CLI, OpenCode and others), copy the `skills/sw-*` folders from a clone into it. Neither has been tested. Expect these limits:
+Agents that load `SKILL.md` folders from `~/.agents/skills` get the skills with the target `global`. For an agent with a skills folder of its own (Cursor, Gemini CLI, OpenCode and others), copy each `skills/<name>` folder from a clone into it as `sw-<name>`, and set `name: sw-<name>` in its `SKILL.md`. Neither has been tested. Expect these limits:
 
 - planning, implementing and reviewing run in the main session, not in subagents;
-- `sw-config` cannot set a model per role;
-- `sw-stats` and `sw-doctor` do not work.
+- `sw:config` cannot set a model per role;
+- `sw:usage` and `sw:doctor` do not work.
 
 ### Next to other skill sets
 
 Superwiki can be installed next to a planning skill set that runs in the main session.
 
-- The rules in `AGENTS.md` tell the agent to use the Superwiki skills first for work in the vault. If another skill set still answers a bare `/sw-...` command, name the skill in a sentence: "use the sw-implement skill for T-02".
+- The rules in `AGENTS.md` tell the agent to use the Superwiki skills first for work in the vault. If another skill answers instead, name the skill in a sentence: "use the sw:implement skill for T-02".
 - Folders other tools create under `docs/` are left alone. Superwiki only reads and writes `index.md`, `log.md`, `raw/`, `wiki/`, `tasks/` and `plans/`.
-- Your project's own rules can contradict the Superwiki block. A rule that forbids subagents, for instance, makes the main session plan and implement itself, which costs more. Nothing detects such a conflict, so read your rules after `/sw-init`.
+- Your project's own rules can contradict the Superwiki block. A rule that forbids subagents, for instance, makes the main session plan and implement itself, which costs more. Nothing detects such a conflict, so read your rules after `/sw:init`.
 
 ### Update
 
@@ -163,9 +165,9 @@ Superwiki can be installed next to a planning skill set that runs in the main se
 npx superwiki@latest install claude      # the same command you installed with
 ```
 
-Then run `/sw-init` again in each project. It updates the script, the templates and the viewer in `docs/`, and the skills kept in the repository if you chose that, and keeps your content. Commit the result.
+Then run `/sw:init` again in each project. It updates the script, the templates and the viewer in `docs/`, and the Codex and Copilot copies kept in the repository if you chose that, and keeps your content. Commit the result.
 
-If your session loaded `sw-init` from the project's own copy of the skills, update that copy with the installer instead: `npx superwiki@latest install --project . claude`.
+If your Codex or Copilot session loaded `sw:init` from the project's own copy of the skills, update that copy with the installer instead: `npx superwiki@latest install --project . codex`.
 
 ### Uninstall
 
@@ -185,7 +187,7 @@ git clone https://github.com/mhmtsrfglu/superwiki ~/.superwiki
 ~/.superwiki/install.sh claude       # same targets and options as npx superwiki install
 ```
 
-`install.sh` links the skills instead of copying them, so `git pull` updates every agent. Links only work on your machine: for a project install add `--copy`. `--uninstall` removes.
+`install.sh` installs the plugin from the clone and links the Codex and Copilot copies to it instead of copying them, so `git pull` updates every agent. Links only work on your machine: for a project install add `--copy`. `--uninstall` removes.
 
 ## Use
 
@@ -198,50 +200,51 @@ Why does M-06 exist, and what is it blocked by?
 Users get the magic-link email twice. Have we seen this before?
 ```
 
-Commands are shown as typed in Claude Code; in Codex write `$sw-plan` instead of `/sw-plan`. Task ids are an area prefix and a number, such as `P-15`.
+Commands are shown as typed in Claude Code. Codex and Copilot CLI see each skill as `sw-<name>`: in Codex write `$sw-<name>` for `/sw:<name>`, in Copilot CLI `/sw-<name>`. Task ids are an area prefix and a number, such as `P-15`.
 
 ### Set up
 
 | Command | What it does |
 | --- | --- |
-| `/sw-init` | set up `docs/` in the current project, or upgrade it |
-| `/sw-migrate` | convert task tables the project already has, on a git branch of its own |
-| `/sw-config plan with opus, implement with sonnet` | choose the model for planning, implementing and reviewing; add task areas |
+| `/sw:init` | set up `docs/` in the current project, or upgrade it |
+| `/sw:migrate` | convert task tables the project already has, on a git branch of its own |
+| `/sw:config plan with opus, implement with sonnet` | choose the model for planning, implementing and reviewing; add task areas |
 
 ### Work on tasks
 
 | Command | What it does |
 | --- | --- |
-| `/sw-do P-15` | take one task from todo to done. A small task goes straight to work; a large one gets a plan you approve first. Say "without presenting the plan" to skip the approval: the plan is still written, its assumed answers are recorded as yours, and you are still asked about a proposed split and about checks that start services. Without an id, it offers the tasks that can start |
-| `/sw-run the backend tasks` | work through several tasks in a row without asking at each step. It stops when a task needs you and reports every decision it made in your place |
-| `/sw-explain M-06` | what a task is, why it exists, what it waits on and what it unblocks |
-| `/sw-triage uploads hang at 100% since yesterday` | for a problem: has it happened before, what was learned, likely causes |
+| `/sw:plan-implement P-15` | take one task from todo to done. A small task goes straight to work; a large one gets a plan you approve first. Say "without presenting the plan" to skip the approval: the plan is still written, its assumed answers are recorded as yours, and you are still asked about a proposed split and about checks that start services. Without an id, it offers the tasks that can start |
+| `/sw:autopilot the backend tasks` | work through several tasks in a row without asking at each step. It stops when a task needs you and reports every decision it made in your place |
+| `/sw:explain M-06` | what a task is, why it exists, what it waits on and what it unblocks |
+| `/sw:review P-15` | have the change reviewed by the reviewer role, on a task of any status, without changing it; for a done task it offers a follow-up task for blocking findings |
+| `/sw:triage uploads hang at 100% since yesterday` | for a problem: has it happened before, what was learned, likely causes |
 
-`sw-do` runs three steps that you can also run one at a time:
+`sw:plan-implement` runs three steps that you can also run one at a time:
 
 | Command | What it does |
 | --- | --- |
-| `/sw-plan P-15` | have a plan written and approve it. Items the plan proves by a test are marked "(test)" in the task. `/sw-plan add CSV export` creates the task first |
-| `/sw-implement P-15` | build the task, have it reviewed if the task asks for a review, and record the result. An item built differently from its wording comes back to you to accept or send back |
-| `/sw-summarize P-15` | check each "Done when" item with a command that could have failed and write the evidence into the task file. A "(test)" item also needs its test seen failing before the code, and one deliberate break of the task's central rule; the last command is the project's full check, then `git status` |
+| `/sw:plan P-15` | have a plan written and approve it. Items the plan proves by a test are marked "(test)" in the task. `/sw:plan add CSV export` creates the task first |
+| `/sw:implement P-15` | build the task, have it reviewed if the task asks for a review, and record the result. An item built differently from its wording comes back to you to accept or send back |
+| `/sw:verify P-15` | check each "Done when" item with a command that could have failed and write the evidence into the task file. A "(test)" item also needs its test seen failing before the code, and one deliberate break of the task's central rule; the last command is the project's full check, then `git status` |
 
 ### Keep the wiki
 
 | Command | What it does |
 | --- | --- |
-| `/sw-ingest ~/Downloads/interview-notes.md` | file a source and summarize it into the wiki |
-| `/sw-lint` | check links, frontmatter and task dependencies |
-| `/sw-board` | rewrite the task list in `index.md` after you edited task files by hand |
-| `/sw-visualize` | open the task board and the wiki in the browser |
+| `/sw:ingest ~/Downloads/interview-notes.md` | file a source and summarize it into the wiki |
+| `/sw:lint` | check links, frontmatter and task dependencies |
+| `/sw:index` | rewrite the task list in `index.md` after you edited task files by hand |
+| `/sw:view` | open the task board and the wiki in the browser |
 
 ### Watch the cost
 
 | Command | What it does |
 | --- | --- |
-| `/sw-stats` | what the current session has used, per agent |
-| `/sw-doctor` | what a session carries before any work, and what can be switched off for this project. It asks before changing anything |
+| `/sw:usage` | what the current session has used, per agent |
+| `/sw:doctor` | what a session carries before any work, and what can be switched off for this project. It asks before changing anything |
 
-`sw-stats` prints one row for the main session and one for each subagent. This is a real task, planned, implemented and reviewed in 37 minutes:
+`sw:usage` prints one row for the main session and one for each subagent. This is a real task, planned, implemented and reviewed in 37 minutes:
 
 ```text
 agent           model              steps  first  peak   sent  cached  output  tools  min
@@ -254,7 +257,7 @@ total                                149      -     -  20.9M     95%     43k    
 
 `first` and `peak` are the tokens sent with one request; `sent` is that, summed over every step. Each step sends the whole context again, which is why Superwiki keeps contexts small.
 
-`sw-stats` reads the session of the project it runs in. Run it from the same working directory as the task, or it reports another session.
+`sw:usage` reads the session of the project it runs in. Run it from the same working directory as the task, or it reports another session.
 
 ### The CLI
 
@@ -267,7 +270,7 @@ node docs/.sw/sw.mjs check P-15             # can it start or finish, its "done 
 node docs/.sw/sw.mjs explain P-15           # dependencies, what it unblocks, its plan
 node docs/.sw/sw.mjs search sync timeout    # where something is mentioned
 node docs/.sw/sw.mjs lint                   # broken links, bad frontmatter, dependency errors
-node docs/.sw/sw.mjs board                  # rewrite the task list in index.md
+node docs/.sw/sw.mjs index                  # rewrite the task list in index.md
 node docs/.sw/sw.mjs serve --open           # the viewer
 ```
 

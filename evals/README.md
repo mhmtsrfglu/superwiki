@@ -13,7 +13,7 @@ The inputs are English translations of the audit's originals, which were mostly 
 
 ## Routing
 
-What it measures: whether the skill descriptions and the Superwiki block of `AGENTS.md` settle which skill an agent invokes first, for 36 typical first messages, and whether that choice holds when a competing skill set is installed. Each message has an expectation in `routing/messages.md`.
+What it measures: whether the skill descriptions and the Superwiki block of `AGENTS.md` settle which skill an agent invokes first, for 36 typical first messages, and whether that choice holds when a competing skill set is installed. Each message has an expectation in `routing/messages.md`. The skills are listed as a Claude Code plugin install shows them to the model, `sw:<name>`, with the plugin name taken from `.claude-plugin/plugin.json`.
 
 What it does not measure: whether the skill fires in a live session. The answer is an agent's own statement about what it would do, on one model, with the descriptions laid out in a file; a harness that loads skills differently, or another model, can pick differently. It says nothing about what happens after the skill is chosen.
 
@@ -64,11 +64,10 @@ Three fresh agents per condition, at least. Three is the floor: a single run is 
 - `agreement` counts the messages where every repetition gave the same pick. A disagreement is a signal even when the expectation matched, because the next run may fall the other way.
 - The `unsure` column counts repetitions that marked the message `unsure`. An unsure mark is a signal even when the pick matches: the descriptions did not settle it.
 - Compare messages, not only the summary lines: which messages moved since the last row in `results.md`, and to which skill.
-- Message 33 has no expectation until T-07 adds `sw-review`. Its picks are shown and never fail the run.
 
 ## Dry-run
 
-What it measures: the places where a fresh reader, following the skill texts alone through a concrete scenario, has to guess, finds two texts that disagree, or reaches a case no text covers. `dry-run/chain.md` follows one task through `sw-do` and the planner, implementer and reviewer roles; `dry-run/run.md` follows an unattended `sw-run` over three tasks.
+What it measures: the places where a fresh reader, following the skill texts alone through a concrete scenario, has to guess, finds two texts that disagree, or reaches a case no text covers. `dry-run/chain.md` follows one task through `sw:plan-implement` and the planner, implementer and reviewer roles; `dry-run/run.md` follows an unattended `sw:autopilot` over three tasks.
 
 What it does not measure: what an agent actually does. It is a simulation; nothing is built, and the consequence a reader gives a finding (`wrong result`, `wasted work`, `cosmetic`) is what could happen, not what was observed. A clean dry-run does not show that the workflow works end to end.
 

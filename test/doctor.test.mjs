@@ -5,7 +5,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-const cli = new URL('../skills/sw-init/assets/sw.mjs', import.meta.url).pathname;
+const cli = new URL('../skills/init/assets/sw.mjs', import.meta.url).pathname;
 
 // A home folder for the tools' session records and a project that the sessions ran in.
 function setup() {
@@ -38,7 +38,7 @@ test('claude: the context blocks before the first reply, each with its sources',
   const dirs = setup();
   writeLines(claudePath(dirs, 's1'), [
     attachment({ type: 'instructions', files: [{ path: '/p/app/AGENTS.md', content: text(2048) }, { path: '/h/memory/MEMORY.md', content: text(4096) }] }),
-    attachment({ type: 'skill_listing', content: text(3072), names: ['sw-plan', 'ads:audit', 'ads:copy', 'seo:audit'] }),
+    attachment({ type: 'skill_listing', content: text(3072), names: ['sw:plan', 'ads:audit', 'ads:copy', 'seo:audit', 'my-skill'] }),
     attachment({ type: 'agent_listing_delta', addedTypes: ['sw-planner', 'ads:writer'], addedLines: [text(600), text(600)] }),
     attachment({ type: 'deferred_tools_delta', addedNames: ['mcp__drive__read', 'mcp__drive__write', 'WebFetch'], addedLines: [text(400), text(400), text(400)] }),
     attachment({ type: 'mcp_instructions_delta', addedNames: ['drive', 'chrome'], addedBlocks: [text(1024), text(512)] }),
@@ -57,13 +57,13 @@ test('claude: the context blocks before the first reply, each with its sources',
   ]);
   const parts = partsOf(result);
   assert.deepEqual(parts['rule and memory files'].sources, [{ label: 'memory/MEMORY.md', amount: 4096 }, { label: 'app/AGENTS.md', amount: 2048 }]);
-  assert.deepEqual(parts['skill list'].sources, [{ label: 'ads', amount: 2 }, { label: '(none)', amount: 1 }, { label: 'seo', amount: 1 }]);
+  assert.deepEqual(parts['skill list'].sources, [{ label: 'ads', amount: 2 }, { label: 'sw', amount: 1 }, { label: 'seo', amount: 1 }, { label: '(none)', amount: 1 }]);
   assert.deepEqual(parts['tool names (loaded on demand)'].sources, [{ label: 'drive', amount: 2 }, { label: '(none)', amount: 1 }]);
 
   const out = doctor(dirs).stdout;
   assert.match(out, /^context at session start {2}claude {2}s1\nfirst request: 40k tokens\npart +size +holds\n/);
   assert.match(out, /\nrule and memory files +6\.0 KB {2}memory\/MEMORY\.md 4\.0 KB, app\/AGENTS\.md 2\.0 KB\n/);
-  assert.match(out, /\nskill list +3\.0 KB {2}4: ads 2, \(none\) 1, seo 1\n/);
+  assert.match(out, /\nskill list +3\.0 KB {2}5: ads 2, sw 1, seo 1, \(none\) 1\n/);
   assert.match(out, /\nsession-start hooks +1\.0 KB\n/, 'a part that is one text lists no sources');
   assert.match(out, /\nsizes are characters of text; \/context shows this session's context in tokens\n$/);
 });

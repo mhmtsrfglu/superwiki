@@ -1,14 +1,16 @@
 // The task board: the open tasks as a section of index.md, so a person can follow the work in the
-// vault itself, without the viewer. It is a view, written from the task files by `sw.mjs board`
+// vault itself, without the viewer. It is a view, written from the task files by `sw.mjs index`
 // and never edited by hand; a task's status still lives only in its own frontmatter.
 // Open tasks get a line each. Finished ones are listed by id only, so the section stays small as
 // a project grows: index.md is the one file every session reads.
 import { summary, taskOf, tasksIn } from './core.js';
 
+// The markers name the command as it was called when they were introduced (`board`, now also
+// `index`); they stay as they are, so that every vault written so far keeps one board.
 const BOARD_START = '<!-- sw:board:start (written by `sw.mjs board`; do not edit) -->';
 const BOARD_END = '<!-- sw:board:end -->';
 const BOARD_BLOCK = /<!-- sw:board:start[^\n]*-->\n[\s\S]*?<!-- sw:board:end -->/;
-const REFRESH = 'run `node docs/.sw/sw.mjs board`';
+const REFRESH = 'run `node docs/.sw/sw.mjs index`';
 
 // Sections in reading order: what is being worked on, what can start, what waits.
 const OPEN_STATES = [['progress', 'In progress'], ['ready', 'Ready'], ['blocked', 'Blocked']];

@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
-# Installs the Superwiki skills from this checkout by linking them into the folder each agent reads.
+# Installs Superwiki from this checkout: the plugin for Claude Code, with this checkout as its
+# marketplace, and the skills linked into the folder each other agent reads.
 # A thin wrapper around bin/superwiki.mjs, for people who cloned the repository.
 #
-#   ./install.sh claude                 link the skills for Claude Code
-#   ./install.sh --copy all             copy instead of link
+#   ./install.sh claude                 the plugin sw@superwiki for Claude Code, from this checkout
+#   ./install.sh codex                  link the skills for Codex, as sw-<name>
+#   ./install.sh --copy all             copy instead of link (the plugin is installed either way)
 #   ./install.sh --uninstall codex      remove them
 #   ./install.sh --help
 set -euo pipefail

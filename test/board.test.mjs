@@ -5,7 +5,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-const init = new URL('../skills/sw-init/scripts/init.mjs', import.meta.url).pathname;
+const init = new URL('../skills/init/scripts/init.mjs', import.meta.url).pathname;
 const sw = (root, ...args) => spawnSync('node', [join(root, 'docs/.sw/sw.mjs'), ...args], { encoding: 'utf8', cwd: root });
 const index = root => readFileSync(join(root, 'docs/index.md'), 'utf8');
 
@@ -31,7 +31,7 @@ function vault() {
 test('board lists open tasks a line each and finished ones by id, under the title', () => {
   const root = vault();
   const out = sw(root, 'board');
-  assert.equal(out.stdout, 'board: docs/index.md updated  ready 1  in-progress 1  blocked 1  done 3\n');
+  assert.equal(out.stdout, 'index: docs/index.md updated  ready 1  in-progress 1  blocked 1  done 3\n');
   assert.equal(index(root), [
     '# Index',
     '',
@@ -60,7 +60,7 @@ test('board lists open tasks a line each and finished ones by id, under the titl
     'Catalog of the wiki: one line per page, `- [[file-name]]: summary`, grouped by type.',
     '',
   ].join('\n'));
-  assert.equal(sw(root, 'board').stdout, 'board: docs/index.md unchanged  ready 1  in-progress 1  blocked 1  done 3\n');
+  assert.equal(sw(root, 'board').stdout, 'index: docs/index.md unchanged  ready 1  in-progress 1  blocked 1  done 3\n');
   assert.equal(JSON.parse(sw(root, 'board', '--json').stdout).changed, false);
 });
 
@@ -82,7 +82,7 @@ test('lint says when the list is missing or out of date, as a warning', () => {
   const root = vault();
   const missing = sw(root, 'lint');
   assert.equal(missing.status, 0);
-  assert.match(missing.stdout, /W stale-board {2}docs\/index\.md {2}the task list is out of date; run `node docs\/\.sw\/sw\.mjs board`/);
+  assert.match(missing.stdout, /W stale-board {2}docs\/index\.md {2}the task list is out of date; run `node docs\/\.sw\/sw\.mjs index`/);
 
   sw(root, 'board');
   assert.doesNotMatch(sw(root, 'lint').stdout, /board/);

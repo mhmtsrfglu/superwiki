@@ -185,11 +185,11 @@ test('a duplicate answer, no answer line or an unknown number exits 2', () => {
   assert.equal(routing('rank').status, 2);
 });
 
-test('probe on the real repository lists the 17 skills as sw:<name>', () => {
+test('probe on the real repository lists the 18 skills as sw:<name>', () => {
   const cli = routing('probe');
   assert.equal(cli.status, 0, cli.stderr);
-  assert.equal(cli.stdout.split('\n').filter(line => line.startsWith('- sw:')).length, 17);
+  assert.equal(cli.stdout.split('\n').filter(line => line.startsWith('- sw:')).length, 18);
   assert.match(cli.stdout, /^- sw:review: /m);
   assert.doesNotMatch(cli.stdout, /^- sw:sw-/m);
-  assert.match(cli.stdout, /Reply with exactly 36 lines/);
+  assert.match(cli.stdout, /Reply with exactly 38 lines/);
 });

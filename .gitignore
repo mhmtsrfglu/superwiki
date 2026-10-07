@@ -2,3 +2,7 @@ node_modules/
 .DS_Store
 site/
 docs/
+!evals/e2e/fixture/docs/
+evals/e2e/fixture/docs/.sw/
+evals/e2e/fixture/docs/viewer.html
+.claude/agents/

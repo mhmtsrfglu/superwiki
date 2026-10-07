@@ -17,7 +17,7 @@ Wiki:
 
 - Link vault pages as `[[file-name]]`; file names are unique across the vault. Use normal markdown links for `raw/` files and URLs, and plain paths for code.
 - When you add or rename a wiki page, update its line in `index.md`.
-- Answer questions from the wiki, index first. Offer to save an answer worth keeping as a wiki page.
+- Answer questions from the vault with `sw:search`: index first, every claim with its reference.
 
 Tasks:
 
@@ -37,6 +37,7 @@ Skills. Use these without being asked. For work in this vault they come before a
 - Several tasks in a row without the user at each step: `sw:autopilot`.
 - A question about a task (what, why, what it blocks): `sw:explain`.
 - A review of a task's change on request, without implementing it: `sw:review`.
+- A question to the vault in plain words (what do we know about X, what was decided): `sw:search`.
 - A bug, failure or unexpected behavior is reported: `sw:triage` first, before any debugging.
 - A source to file (article, notes, transcript, URL): `sw:ingest`.
 - Codex and Copilot CLI see these skills as `sw-<name>`.

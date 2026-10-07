@@ -19,7 +19,7 @@ const HELP = `sw <command> [--docs <dir>] [--json]
   ready           tasks that can start now, and tasks in progress
   check <ID>      can this task start / finish? counts its "Done when" items, lists what is open
   explain <ID>    a task's dependencies, what it blocks and unblocks, its plan and linked pages
-  search <words>  pages and log entries that mention the words, best match first
+  search <words>  pages, raw sources and log entries that mention the words, best match first
   next-id <AREA>  next free task id for an area (numbers are never reused)
   index           rewrite the task list in docs/index.md from the task files
   lint            structural checks; exit code 1 on errors
@@ -36,17 +36,21 @@ const LOG_HITS_SHOWN = 6;
 
 // ---------- Reading the vault ----------
 
-function walk(dir, rel, out) {
+const PAGE_FILES = /\.md$/i;
+const RAW_FILES = /\.(md|txt)$/i;
+
+function walk(dir, rel, out, pattern) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     if (entry.name.startsWith('.')) continue;
     const path = join(dir, entry.name);
-    if (entry.isDirectory()) walk(path, `${rel}${entry.name}/`, out);
-    else if (entry.name.endsWith('.md')) out.push({ path: rel + entry.name, text: readFileSync(path, 'utf8') });
+    if (entry.isDirectory()) walk(path, `${rel}${entry.name}/`, out, pattern);
+    else if (pattern.test(entry.name)) out.push({ path: rel + entry.name, text: readFileSync(path, 'utf8') });
   }
 }
 
-// The vault's markdown files as [{ path, text }]. The log only ever grows, so commands that do not
-// show it record its presence without reading it.
+// The vault's markdown files as [{ path, text }], and the text sources under raw/ (markdown and
+// plain text), which only `search` reads. The log only ever grows, so commands that do not show it
+// record its presence without reading it.
 function readFiles(docs, { withLog }) {
   const files = [];
   for (const name of ROOT_FILES) {
@@ -55,8 +59,9 @@ function readFiles(docs, { withLog }) {
     files.push({ path: name, text: skip ? '' : readFileSync(join(docs, name), 'utf8') });
   }
   for (const folder of VAULT_FOLDERS) {
-    if (existsSync(join(docs, folder))) walk(join(docs, folder), `${folder}/`, files);
+    if (existsSync(join(docs, folder))) walk(join(docs, folder), `${folder}/`, files, PAGE_FILES);
   }
+  if (existsSync(join(docs, 'raw'))) walk(join(docs, 'raw'), 'raw/', files, RAW_FILES);
   return files;
 }
 
@@ -221,17 +226,19 @@ function searchCommand({ docs, vault, args }) {
   const hits = search(vault, query);
   const logHits = searchLog(docs, query.toLowerCase().split(/\s+/).filter(w => w.length > 1));
   const shownLog = logHits.slice(-LOG_HITS_SHOWN);
-  // Plans have no summary; their first heading says what they are.
+  // Plans and raw sources have no summary; their first heading says what they are.
   const about = p => p.data.summary || p.data.title || (p.body.match(/^#+\s+(.*)$/m) || [])[1] || '';
-  const kind = p => (p.folder === 'tasks' ? `task ${taskOf(vault, p.data.id || p.name)?.state ?? ''}` : p.data.type || p.folder);
+  const kind = p => (p.folder === 'tasks' ? `task ${taskOf(vault, p.data.id || p.name)?.state ?? ''}` : p.folder === 'raw' ? 'raw' : p.data.type || p.folder);
+  // The matching line, under the heading it sits in, so that an answer can cite the section.
+  const hitLine = h => (h.line ? `\n    ${h.heading ? `[${h.heading}] ` : ''}${h.line}` : '');
   return {
     data: {
-      pages: hits.map(h => ({ path: `docs/${h.page.path}`, type: kind(h.page), summary: about(h.page), termsMatched: h.matched, line: h.line })),
+      pages: hits.map(h => ({ path: `docs/${h.page.path}`, type: kind(h.page), summary: about(h.page), termsMatched: h.matched, line: h.line, heading: h.heading })),
       log: shownLog,
     },
     text: [
       `pages (${hits.length}), best match first; a page matching one common word is a weak match`,
-      ...hits.map(h => `docs/${h.page.path}  [${kind(h.page)}]  ${about(h.page)}${h.line ? `\n    ${h.line}` : ''}`),
+      ...hits.map(h => `docs/${h.page.path}  [${kind(h.page)}]  ${about(h.page)}${hitLine(h)}`),
       `log entries (${logHits.length}${logHits.length > LOG_HITS_SHOWN ? `, last ${LOG_HITS_SHOWN} shown` : ''})`,
       ...shownLog,
     ].join('\n'),

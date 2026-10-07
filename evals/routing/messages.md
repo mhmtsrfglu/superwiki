@@ -1,6 +1,6 @@
 # Routing messages
 
-These are the 36 user messages of the routing probe, in English translation. The originals, most of them in Turkish, are in appendix A of [the audit source](../../docs/raw/2026-10-05-prompt-quality-audit.md); the translation keeps their meaning, register and ambiguity and makes nothing clearer. Each message is the first message of a new session in a project with a vault and the task module on. Messages 1 and 34, and 2 and 3, were the same request in two languages and are now the same text; they keep their numbers and expectations.
+These are the 38 user messages of the routing probe, in English translation. The originals of 1 to 36, most of them in Turkish, are in appendix A of [the audit source](../../docs/raw/2026-10-05-prompt-quality-audit.md); the translation keeps their meaning, register and ambiguity and makes nothing clearer. Messages 37 and 38 were added with `sw:search` (T-16). Each message is the first message of a new session in a project with a vault and the task module on. Messages 1 and 34, and 2 and 3, were the same request in two languages and are now the same text; they keep their numbers and expectations.
 
 `expect` is the skill the message should reach first, copied from the audit and written as the plugin names the skills, `sw:<name>`; a skill renamed since the audit is expected under its new name. `none` means the agent should handle the message without any skill; `-` means no expectation is set yet. A message may not contain `|`.
 
@@ -35,10 +35,12 @@ These are the 36 user messages of the routing probe, in English translation. The
 | 27 | what did T-02 do? | sw:verify |
 | 28 | how many tasks are left? | none |
 | 29 | plan and implement T-09 | sw:plan-implement |
-| 30 | what does the wiki say about offline sync? | none |
+| 30 | what does the wiki say about offline sync? | sw:search |
 | 31 | start T-05 | sw:implement |
 | 32 | write a unit test for the React component | none |
 | 33 | review T-05's implementation | sw:review |
 | 34 | do T-05 | sw:plan-implement |
 | 35 | what should I work on next? | sw:plan |
 | 36 | the build is failing on CI since this morning | sw:triage |
+| 37 | do we have anything in the vault about rate limiting? | sw:search |
+| 38 | what was decided about session tokens, and where is it written down? | sw:search |

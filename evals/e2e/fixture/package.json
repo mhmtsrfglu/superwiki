@@ -1,0 +1,10 @@
+{
+  "name": "items",
+  "version": "0.1.0",
+  "description": "A small item list: the fixture project of Superwiki's end-to-end evals.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  }
+}

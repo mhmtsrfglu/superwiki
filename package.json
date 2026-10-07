@@ -38,7 +38,7 @@
   },
   "scripts": {
     "build": "node scripts/build.mjs",
-    "test": "node scripts/build.mjs && node --test",
+    "test": "node scripts/build.mjs && node --test 'test/*.test.mjs'",
     "prepublishOnly": "npm test"
   }
 }

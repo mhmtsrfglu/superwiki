@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { request } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -100,10 +100,15 @@ test('explain: dependencies, what it unblocks, area guide', () => {
   assert.match(sw(root, 'explain', 'T-01').stdout, /area guide: docs\/wiki\/guide-t\.md/);
 });
 
-test('search: pages by match, with the task state', () => {
+test('search: pages by match, with the task state; raw sources with the heading of the hit', () => {
   const root = vault();
+  mkdirSync(join(root, 'docs/raw'), { recursive: true });
+  writeFileSync(join(root, 'docs/raw/2026-01-01-notes.md'), '# Notes\n\n## Open\n\nTask T-02 waits.\n');
   const out = sw(root, 'search', 'Task', 'T-02').stdout;
-  assert.match(out, /^pages \(2\)[^\n]*\ndocs\/tasks\/T-02\.md {2}\[task blocked\]/);
+  assert.match(out, /^pages \(3\)[^\n]*\ndocs\/tasks\/T-02\.md {2}\[task blocked\]/);
+  assert.match(out, /\ndocs\/raw\/2026-01-01-notes\.md {2}\[raw\] {2}Notes\n {4}\[Open\] Task T-02 waits\.\n/);
+  const json = JSON.parse(sw(root, 'search', '--json', 'Task', 'T-02').stdout);
+  assert.deepEqual(json.pages.find(p => p.type === 'raw'), { path: 'docs/raw/2026-01-01-notes.md', type: 'raw', summary: 'Notes', termsMatched: 2, line: 'Task T-02 waits.', heading: 'Open' });
   assert.equal(sw(root, 'search').status, 2);
 });
 

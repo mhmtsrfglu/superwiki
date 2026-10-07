@@ -165,6 +165,28 @@ test('search: more distinct terms first, head hits outweigh body, lessons booste
   assert.deepEqual(search(v, 'zzz'), []);
 });
 
+test('search: raw sources are searched too, each hit names the heading above its line', () => {
+  const v = buildVault([
+    index('offline-sync'),
+    page('offline-sync', 'Intro.\n\n## Background\n\nSync runs in the background. A timeout aborts it.'),
+    page('no-heading', 'The sync timeout bug, named before any heading. Sync timeout, again.'),
+    { path: 'raw/2026-01-01-audit.md', text: '# Audit\n\nIntro.\n\n```\n# not a heading: sync timeout\n```\n\n## Findings\n\nThe sync timeout bug.' },
+    { path: 'raw/notes.txt', text: 'Plain notes.\nTimeout seen on Monday.' },
+  ]);
+  const hits = search(v, 'sync timeout');
+  assert.deepEqual(hits.map(h => [h.page.folder, h.page.name, h.heading]), [
+    ['wiki', 'offline-sync', 'Background'],
+    ['wiki', 'no-heading', ''],
+    ['raw', '2026-01-01-audit', 'Findings'],
+    ['raw', 'notes', ''],
+  ]);
+  assert.equal(hits[2].page.path, 'raw/2026-01-01-audit.md');
+  assert.match(hits[2].line, /^The sync timeout bug/);
+  assert.ok(!v.pages.some(p => p.folder === 'raw'), 'raw sources are not pages');
+  assert.equal(v.raw.length, 2);
+  assert.ok(!lint(v).some(f => f.path.startsWith('raw/')), 'lint says nothing about raw sources');
+});
+
 test('area guide: found by area, exempt from the orphan warning', () => {
   const files = [index('guide-p'), page('guide-p', 'Layout', 'type: guide\narea: P\nsummary: How to work in the panel.'), task('P-01'), task('M-01')];
   const v = buildVault(files);

@@ -5,11 +5,11 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 const skillsDir = new URL('../skills/', import.meta.url);
 const skill = name => readFileSync(new URL(`${name}/SKILL.md`, skillsDir), 'utf8');
 
-// The 17 skills, by folder name. The plugin `sw` gives each its name, sw:<name>; a folder named
+// The 18 skills, by folder name. The plugin `sw` gives each its name, sw:<name>; a folder named
 // sw-<name> would show as sw:sw-<name> in a plugin install (DESIGN.md, "Names").
 const SKILLS = [
   'autopilot', 'config', 'doctor', 'explain', 'implement', 'index', 'ingest', 'init', 'lint',
-  'migrate', 'plan', 'plan-implement', 'review', 'triage', 'usage', 'verify', 'view',
+  'migrate', 'plan', 'plan-implement', 'review', 'search', 'triage', 'usage', 'verify', 'view',
 ];
 
 // sw:plan and sw:implement must work without sw:plan-implement loaded, so each of the three carries

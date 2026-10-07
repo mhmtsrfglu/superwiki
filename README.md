@@ -217,6 +217,7 @@ Commands are shown as typed in Claude Code. Codex and Copilot CLI see each skill
 | `/sw:plan-implement P-15` | take one task from todo to done. A small task goes straight to work; a large one gets a plan you approve first. Say "without presenting the plan" to skip the approval: the plan is still written, its assumed answers are recorded as yours, and you are still asked about a proposed split and about checks that start services. Without an id, it offers the tasks that can start |
 | `/sw:autopilot the backend tasks` | work through several tasks in a row without asking at each step. It stops when a task needs you and reports every decision it made in your place |
 | `/sw:explain M-06` | what a task is, why it exists, what it waits on and what it unblocks |
+| `/sw:search what do we know about offline sync?` | answer a question from the vault, every claim with its reference: a wiki page, task, plan, log entry or raw source. What the vault does not record is said to be not recorded |
 | `/sw:review P-15` | have the change reviewed by the reviewer role, on a task of any status, without changing it; for a done task it offers a follow-up task for blocking findings |
 | `/sw:triage uploads hang at 100% since yesterday` | for a problem: has it happened before, what was learned, likely causes |
 

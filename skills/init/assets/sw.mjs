@@ -143,15 +143,24 @@ export function closingSummary(body) {
 const key = name => String(name).toLowerCase();
 const areaOf = id => (String(id).includes('-') ? String(id).slice(0, String(id).lastIndexOf('-')) : '');
 
-// files: [{ path, text }] with paths relative to docs/ ("wiki/foo.md"). Anything outside
-// index.md, log.md, wiki/, tasks/ and plans/ belongs to other tools and is ignored.
+// files: [{ path, text }] with paths relative to docs/ ("wiki/foo.md"). Pages are the .md files in
+// index.md, log.md, wiki/, tasks/ and plans/. Files under raw/ (any extension) are sources: they are
+// kept apart in `vault.raw`, page-shaped so that `search` can scan them, and no check reads them.
+// Anything else belongs to other tools and is ignored.
 export function buildVault(files) {
   const pages = [];
+  const raw = [];
   const names = new Map();
   for (const f of files) {
     const path = String(f.path).replace(/\\/g, '/').replace(/^\.?\//, '');
-    if (!/\.md$/i.test(path)) continue;
     const parts = path.split('/');
+    if (parts[0] === 'raw' && parts.length > 1) {
+      const name = parts[parts.length - 1].replace(/\.[^.]+$/, '');
+      const fm = parseFrontmatter(f.text);
+      raw.push({ path, folder: 'raw', name, nested: parts.length > 2, data: fm.data || {}, hasFrontmatter: !!fm.data, body: fm.body, bodyLine: fm.bodyLine, links: [], inbound: [] });
+      continue;
+    }
+    if (!/\.md$/i.test(path)) continue;
     const name = parts[parts.length - 1].replace(/\.md$/i, '');
     let folder;
     if (parts.length === 1) { if (!ROOT_PAGES.includes(name)) continue; folder = 'root'; }
@@ -164,7 +173,8 @@ export function buildVault(files) {
     names.get(key(name)).push(page);
   }
   pages.sort((a, b) => a.path.localeCompare(b.path));
-  const vault = { pages, names, tasks: new Map(), plans: new Map(), index: null, log: null };
+  raw.sort((a, b) => a.path.localeCompare(b.path));
+  const vault = { pages, raw, names, tasks: new Map(), plans: new Map(), index: null, log: null };
   vault.index = pages.find(p => p.folder === 'root' && p.name === 'index') || null;
   vault.log = pages.find(p => p.folder === 'root' && p.name === 'log') || null;
   for (const p of pages) for (const l of p.links) {
@@ -353,15 +363,33 @@ export function unblockedBy(vault, id) {
     .map(d => d.id);
 }
 
-// Keyword search over the vault. Pages matching more distinct terms come first; then lessons; a hit
-// in the name, title or summary outweighs hits in the body. Returns [{ page, score, line }].
+// The first line of `body` that one of the regexes matches, and the last markdown heading above it
+// ('' when none precedes it). Lines inside a code fence are neither headings nor matches.
+function firstMatch(body, res) {
+  let heading = '';
+  let fenced = false;
+  for (const raw of body.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (/^(```|~~~)/.test(line)) { fenced = !fenced; continue; }
+    if (fenced) continue;
+    const h = line.match(/^#{1,6}\s+(.*?)\s*#*$/);
+    if (h) heading = h[1];
+    if (res.some(re => re.test(line.toLowerCase()))) return { line: line.slice(0, 140), heading };
+  }
+  return { line: '', heading: '' };
+}
+
+// Keyword search over the vault: pages and raw sources alike. Entries matching more distinct terms
+// come first; then lessons; a hit in the name, title or summary outweighs hits in the body; on a
+// full tie a page comes before a raw source. Returns [{ page, matched, score, line, heading }],
+// `heading` being the heading the matching line sits under.
 export function search(vault, query, limit = 8) {
   const terms = [...new Set(String(query).toLowerCase().split(/[^\p{L}\p{N}_-]+/u).filter(w => w.length > 1))];
   if (!terms.length) return [];
   // A term matches at the start of a word, so "sync" finds "syncing" but "hang" does not find "change".
   const res = terms.map(t => new RegExp(`(?<![\\p{L}\\p{N}])${t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'u'));
   const out = [];
-  for (const p of vault.pages) {
+  for (const p of [...vault.pages, ...(vault.raw || [])]) {
     if (p === vault.index || p === vault.log) continue;
     const head = `${p.name} ${p.data.title || ''} ${p.data.summary || ''}`.toLowerCase();
     const body = p.body.toLowerCase();
@@ -374,12 +402,14 @@ export function search(vault, query, limit = 8) {
       score += (inHead ? 5 : 0) + hits;
     }
     if (!matched) continue;
-    const line = p.body.split(/\r?\n/).find(l => res.some(re => re.test(l.toLowerCase()))) || '';
-    out.push({ page: p, matched, score, line: line.trim().slice(0, 140) });
+    const { line, heading } = firstMatch(p.body, res);
+    out.push({ page: p, matched, score, line, heading });
   }
-  // Among pages matching the same number of terms, a recorded lesson is the most useful thing to read first.
+  // Among entries matching the same number of terms, a recorded lesson is the most useful thing to
+  // read first; at equal score, a wiki page, task or plan is the vault's own word before a raw source.
   const lesson = h => (h.page.data.type === 'lesson' ? 1 : 0);
-  return out.sort((a, b) => b.matched - a.matched || lesson(b) - lesson(a) || b.score - a.score || a.page.path.localeCompare(b.page.path)).slice(0, limit);
+  const isPage = h => (h.page.folder === 'raw' ? 0 : 1);
+  return out.sort((a, b) => b.matched - a.matched || lesson(b) - lesson(a) || b.score - a.score || isPage(b) - isPage(a) || a.page.path.localeCompare(b.page.path)).slice(0, limit);
 }
 
 // The wiki page that tells agents how to work in a task area: `type: guide`, `area: <AREA>`.
@@ -1047,7 +1077,7 @@ const HELP = `sw <command> [--docs <dir>] [--json]
   ready           tasks that can start now, and tasks in progress
   check <ID>      can this task start / finish? counts its "Done when" items, lists what is open
   explain <ID>    a task's dependencies, what it blocks and unblocks, its plan and linked pages
-  search <words>  pages and log entries that mention the words, best match first
+  search <words>  pages, raw sources and log entries that mention the words, best match first
   next-id <AREA>  next free task id for an area (numbers are never reused)
   index           rewrite the task list in docs/index.md from the task files
   lint            structural checks; exit code 1 on errors
@@ -1064,17 +1094,21 @@ const LOG_HITS_SHOWN = 6;
 
 // ---------- Reading the vault ----------
 
-function walk(dir, rel, out) {
+const PAGE_FILES = /\.md$/i;
+const RAW_FILES = /\.(md|txt)$/i;
+
+function walk(dir, rel, out, pattern) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     if (entry.name.startsWith('.')) continue;
     const path = join(dir, entry.name);
-    if (entry.isDirectory()) walk(path, `${rel}${entry.name}/`, out);
-    else if (entry.name.endsWith('.md')) out.push({ path: rel + entry.name, text: readFileSync(path, 'utf8') });
+    if (entry.isDirectory()) walk(path, `${rel}${entry.name}/`, out, pattern);
+    else if (pattern.test(entry.name)) out.push({ path: rel + entry.name, text: readFileSync(path, 'utf8') });
   }
 }
 
-// The vault's markdown files as [{ path, text }]. The log only ever grows, so commands that do not
-// show it record its presence without reading it.
+// The vault's markdown files as [{ path, text }], and the text sources under raw/ (markdown and
+// plain text), which only `search` reads. The log only ever grows, so commands that do not show it
+// record its presence without reading it.
 function readFiles(docs, { withLog }) {
   const files = [];
   for (const name of ROOT_FILES) {
@@ -1083,8 +1117,9 @@ function readFiles(docs, { withLog }) {
     files.push({ path: name, text: skip ? '' : readFileSync(join(docs, name), 'utf8') });
   }
   for (const folder of VAULT_FOLDERS) {
-    if (existsSync(join(docs, folder))) walk(join(docs, folder), `${folder}/`, files);
+    if (existsSync(join(docs, folder))) walk(join(docs, folder), `${folder}/`, files, PAGE_FILES);
   }
+  if (existsSync(join(docs, 'raw'))) walk(join(docs, 'raw'), 'raw/', files, RAW_FILES);
   return files;
 }
 
@@ -1249,17 +1284,19 @@ function searchCommand({ docs, vault, args }) {
   const hits = search(vault, query);
   const logHits = searchLog(docs, query.toLowerCase().split(/\s+/).filter(w => w.length > 1));
   const shownLog = logHits.slice(-LOG_HITS_SHOWN);
-  // Plans have no summary; their first heading says what they are.
+  // Plans and raw sources have no summary; their first heading says what they are.
   const about = p => p.data.summary || p.data.title || (p.body.match(/^#+\s+(.*)$/m) || [])[1] || '';
-  const kind = p => (p.folder === 'tasks' ? `task ${taskOf(vault, p.data.id || p.name)?.state ?? ''}` : p.data.type || p.folder);
+  const kind = p => (p.folder === 'tasks' ? `task ${taskOf(vault, p.data.id || p.name)?.state ?? ''}` : p.folder === 'raw' ? 'raw' : p.data.type || p.folder);
+  // The matching line, under the heading it sits in, so that an answer can cite the section.
+  const hitLine = h => (h.line ? `\n    ${h.heading ? `[${h.heading}] ` : ''}${h.line}` : '');
   return {
     data: {
-      pages: hits.map(h => ({ path: `docs/${h.page.path}`, type: kind(h.page), summary: about(h.page), termsMatched: h.matched, line: h.line })),
+      pages: hits.map(h => ({ path: `docs/${h.page.path}`, type: kind(h.page), summary: about(h.page), termsMatched: h.matched, line: h.line, heading: h.heading })),
       log: shownLog,
     },
     text: [
       `pages (${hits.length}), best match first; a page matching one common word is a weak match`,
-      ...hits.map(h => `docs/${h.page.path}  [${kind(h.page)}]  ${about(h.page)}${h.line ? `\n    ${h.line}` : ''}`),
+      ...hits.map(h => `docs/${h.page.path}  [${kind(h.page)}]  ${about(h.page)}${hitLine(h)}`),
       `log entries (${logHits.length}${logHits.length > LOG_HITS_SHOWN ? `, last ${LOG_HITS_SHOWN} shown` : ''})`,
       ...shownLog,
     ].join('\n'),

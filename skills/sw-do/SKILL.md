@@ -27,13 +27,17 @@ Needs the task module (`docs/tasks/`). If it is missing, say so and offer sw-ini
    | a draft plan | large route; sw-plan revises it |
    | open deps | stop, as sw-implement's gate does. Do not plan around it unasked |
 
-2. **Classify** from the task file alone: no code, no plan file. Take the first row that matches, from the top.
+2. **Classify** from the task file alone: no code, no plan file. The rule for a small task, word for word as sw-plan and sw-implement state it:
+
+   A task is small when its task file alone shows all four: one area, meaning its work belongs to the configured area its id prefix names and to no other (`areas` in `docs/.sw/config.json`; with one configured area, every task is in one area); three "Done when" items or fewer, as the `done when:` line of `node docs/.sw/sw.mjs check <ID>` counts them; nothing left open in its "Notes"; and the files that change, named in the task file, three or fewer. A task whose file does not show how many files change is medium at least, never small.
+
+   Take the first row that matches, from the top. "Area" and the count of "Done when" items mean what the rule above says.
 
    | Class | The task file shows | Route |
    | --- | --- | --- |
    | large | any of: more than six "Done when" items; more than one area; a question left open in "Notes"; `review:` set; a new format, interface or migration other work will depend on | sw-plan, the user's approval, then sw-implement |
-   | small | all of: one area, three "Done when" items or fewer, nothing left open in its notes, the change confined to a few files | sw-implement directly; no plan, no note |
-   | medium | everything else: one area, four to six "Done when" items or more than a few files, nothing open | an "Approach" note in "Notes", then sw-implement |
+   | small | all four conditions of the rule above: one area, three "Done when" items or fewer, nothing left open, three files or fewer named | sw-implement directly; no plan, no note |
+   | medium | everything else: one area, nothing open, and four to six "Done when" items or more than three files or the files not shown | an "Approach" note in "Notes", then sw-implement |
 
 3. **Say the route** in one line before acting: `Route: <class> (<the rubric conditions that decided it>).` Do not wait for an answer. When the user has waived the plan's approval, the line says so: `Route: <class>, plan approval waived by the user (<the rubric conditions that decided it>).`
 
@@ -48,6 +52,7 @@ Needs the task module (`docs/tasks/`). If it is missing, say so and offer sw-ini
 
 - Restating, shortening or skipping steps of sw-plan or sw-implement. They are followed whole, as written.
 - Reading code or a plan file to classify. The rubric uses the task file only.
+- Counting files or areas from the code. A task file that does not name the files that change makes the task medium at least; an area is a configured one, never a part of the code.
 - Asking the user to confirm the route. Say it and go on; the user interrupts if they disagree.
 - Skipping the planner, or lowering the route, because the user waived the plan's approval. A waiver removes the stop, not the plan; only a named route lowers the class.
 - Treating the Approach note as a plan. `check` still says `plan: none`, and the note holds no steps or verification list.

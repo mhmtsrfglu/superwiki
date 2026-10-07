@@ -99,6 +99,19 @@ function levelTwoSections(lines) {
   return out;
 }
 
+// The "Done when" items are the top-level `-`, `*` or `+` bullets of the `## Done when` section; a
+// nested bullet belongs to the item above it. The skills judge a task's size by this count, `check`
+// prints it, and the summary's verification entries are numbered by it.
+function countDoneWhen(lines, sections) {
+  const section = sections.find(s => s.title === 'done when');
+  return section ? lines.slice(section.start + 1, section.end).filter(l => /^[-*+]\s+\S/.test(l)).length : 0;
+}
+
+export function doneWhenItems(body) {
+  const lines = String(body ?? '').split(/\r?\n/);
+  return countDoneWhen(lines, levelTwoSections(lines));
+}
+
 // null when the body has no `## Summary`. Otherwise the verdict counts over the "Done when" items
 // (an item without an entry is unverified), `complete` when every item is verified, the section's
 // markdown without its heading (`text`) and the body without the section (`rest`).
@@ -107,8 +120,7 @@ export function closingSummary(body) {
   const sections = levelTwoSections(lines);
   const section = sections.find(s => s.title === 'summary');
   if (!section) return null;
-  const doneWhen = sections.find(s => s.title === 'done when');
-  const items = doneWhen ? lines.slice(doneWhen.start + 1, doneWhen.end).filter(l => /^[-*+]\s+\S/.test(l)).length : 0;
+  const items = countDoneWhen(lines, sections);
   const inside = lines.slice(section.start + 1, section.end);
   const entries = new Map();
   for (const line of inside) {
@@ -171,6 +183,7 @@ export function buildVault(files) {
       started: d.started || '', finished: d.finished || '',
       // Any value asks for a separate review before the task may be done; the value names the kind.
       review: d.review ? String(d.review) : '',
+      doneWhen: doneWhenItems(p.body),
       // The closing summary's verdicts, or null while the task file has no `## Summary`.
       summary: closingSummary(p.body),
       state: null, wave: 0, dependents: [], plan: null,
@@ -1030,7 +1043,7 @@ const HELP = `sw <command> [--docs <dir>] [--json]
 
   status          task counts per area and wiki page count
   ready           tasks that can start now, and tasks in progress
-  check <ID>      can this task start / finish? lists what is open
+  check <ID>      can this task start / finish? counts its "Done when" items, lists what is open
   explain <ID>    a task's dependencies, what it blocks and unblocks, its plan and linked pages
   search <words>  pages and log entries that mention the words, best match first
   next-id <AREA>  next free task id for an area (numbers are never reused)
@@ -1145,13 +1158,17 @@ function check(ctx) {
   const startLine = t.status === 'todo'
     ? `can start: ${canStart ? 'yes' : `no${openDeps}`}`
     : `can start: n/a, status is ${t.status}${openDeps}`;
+  // The skills read the number of "Done when" items from this line: the size rule, and the numbering
+  // of the summary's verification entries.
+  const doneWhenLine = `done when: ${t.doneWhen} ${t.doneWhen === 1 ? 'item' : 'items'}`;
   const draft = t.plan?.data.status === 'draft' ? '  (draft, not approved)' : '';
   return {
-    data: { id: t.id, status: t.status, canStart, canFinish, openDeps: t.openDeps, openSoftDeps, plan, review: t.review || null, summary: closing },
+    data: { id: t.id, status: t.status, canStart, canFinish, doneWhen: t.doneWhen, openDeps: t.openDeps, openSoftDeps, plan, review: t.review || null, summary: closing },
     text: [
       `${t.id}  ${t.status}  ${t.title}`,
       startLine,
       `can finish: ${canFinish ? 'yes' : 'no'}${openSoftDeps.length ? `  open soft deps: ${openSoftDeps.join(', ')}` : ''}`,
+      doneWhenLine,
       `summary: ${closing ? verdicts || 'no entries' : 'none'}`,
       `plan: ${plan ? plan + draft : 'none'}`,
       `review: ${t.review ? `required (${t.review})` : 'not required'}`,

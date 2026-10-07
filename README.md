@@ -263,7 +263,7 @@ The skills call a small script in your project. You can run it yourself, from th
 ```bash
 node docs/.sw/sw.mjs status                 # counts per area
 node docs/.sw/sw.mjs ready                  # tasks that can start now
-node docs/.sw/sw.mjs check P-15             # can it start, can it finish, what is open
+node docs/.sw/sw.mjs check P-15             # can it start or finish, its "done when:" item count, what is open
 node docs/.sw/sw.mjs explain P-15           # dependencies, what it unblocks, its plan
 node docs/.sw/sw.mjs search sync timeout    # where something is mentioned
 node docs/.sw/sw.mjs lint                   # broken links, bad frontmatter, dependency errors

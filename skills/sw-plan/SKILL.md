@@ -18,7 +18,11 @@ Needs the task module (`docs/tasks/`). If it is missing, say so and offer sw-ini
      - write `docs/tasks/<ID>.md` from `docs/.sw/templates/task.md` with `status: todo`, a "Goal" and a "Done when" list;
      - append `## [date] task | <ID> created` to `docs/log.md`;
      - run `node docs/.sw/sw.mjs board`, so the task list in `index.md` shows it.
-2. **Does it need a plan?** Judge from the task file alone. A task is small when all of these hold: one area, three "Done when" items or fewer, nothing left open in its notes, and the change it describes is confined to a few files. A small task needs no plan: say so and offer `sw-implement <ID>` directly. Go on with planning only if the user wants a plan anyway, or the task is not small. Called from sw-do: the route is already chosen; skip this step.
+2. **Does it need a plan?** Called from sw-do: the route is already chosen; skip this step. Otherwise judge by this rule, word for word as sw-do and sw-implement state it:
+
+   A task is small when its task file alone shows all four: one area, meaning its work belongs to the configured area its id prefix names and to no other (`areas` in `docs/.sw/config.json`; with one configured area, every task is in one area); three "Done when" items or fewer, as the `done when:` line of `node docs/.sw/sw.mjs check <ID>` counts them; nothing left open in its "Notes"; and the files that change, named in the task file, three or fewer. A task whose file does not show how many files change is medium at least, never small.
+
+   A small task needs no plan: say so and offer `sw-implement <ID>` directly. Go on with planning only if the user wants a plan anyway, or the task is not small.
 3. **Clarify.** Ask the user only what the task file leaves open about scope or intent, one question at a time, each with your recommendation. Add the answers to the task's "Notes" now. Do not read code to find questions; the planner surfaces the technical ones. Skip this when nothing is open.
 4. **Dispatch the planner.** Its prompt is: the task id, today's date, the project root if it is not your working directory, and, from the second round on, what the user's reply changed: the answers that differ from the ones the plan assumed, the feedback, the ids of the tasks a split created, or `split declined`. It writes the plan file as a draft and returns a short message.
 
@@ -43,7 +47,7 @@ Needs the task module (`docs/tasks/`). If it is missing, say so and offer sw-ini
 6. **Record**, after approval:
    - in the plan file, change `status: draft` to `status: approved`: read only its frontmatter (the first lines, up to the closing `---`) and change that line with your edit tool;
    - in the task's "Done when", the mark: end each item that `Marks:` in the planner's latest return quotes with " (test)", unless it already ends so. Only that return counts, and `Marks: none` marks nothing;
-   - in the task's "Notes", the answers given in step 5;
+   - in the task's "Notes", the answers given in step 5, each with its question;
    - in the area guide, if `node docs/.sw/sw.mjs explain <ID>` names one, the planner's `Guide:` lines, one line per fact;
    - in `docs/log.md`, a new entry `## [date] plan | <ID>`, in the layout the log's last entries use.
 
@@ -52,13 +56,13 @@ Needs the task module (`docs/tasks/`). If it is missing, say so and offer sw-ini
 
 ## An agreed split
 
-The planner's `Split:` names, per new task, its title, its dependencies and the "Done when" items of `<ID>` it takes over. Once the user agrees:
+The planner's `Split:` names, per new task, its title, its dependencies and the "Done when" items of `<ID>` it takes over, by their `D<n>` ids (`D<n>` is the n-th "Done when" item, as the `done when:` line of `node docs/.sw/sw.mjs check <ID>` counts them). Once the user agrees:
 
 1. For each new task:
    - its id from `node docs/.sw/sw.mjs next-id <AREA>`, where `<AREA>` is the id prefix of `<ID>` (`T` for `T-11`);
-   - `docs/tasks/<NEW>.md` from `docs/.sw/templates/task.md`, without the template's comment: `status: todo`; the title and `deps` the `Split:` line names; `review:`, `milestone:` and `priority:` copied from `<ID>`; `soft_deps:` empty; a "Goal" of one or two lines drawn from the items it takes over; under "Done when" those items, word for word; under "Sources" every link of `<ID>`'s "Sources"; in "Notes" `- Split from [[<ID>]] on <date>.`, then a copy of every note of `<ID>` and every answer the user gave in this round that bears on the moved items, so that the new task is later planned on them;
+   - `docs/tasks/<NEW>.md` from `docs/.sw/templates/task.md`, without the template's comment: `status: todo`; the title and `deps` the `Split:` line names; `review:`, `milestone:` and `priority:` copied from `<ID>`; `soft_deps:` empty; a "Goal" of one or two lines drawn from the items it takes over; under "Done when" those items, word for word; under "Sources" every link of `<ID>`'s "Sources"; in "Notes" `- Split from [[<ID>]] on <date>.`, then a copy of every note of `<ID>` and every answer the user gave in this round, with its question, so that the new task is later planned on them;
    - in `docs/log.md`, `## [date] task | <NEW> created`.
-2. In `docs/tasks/<ID>.md`: remove the moved items from "Done when"; add to `deps` each new task the `Split:` line says `<ID>` must wait for; add to "Notes" `- Split <date>: "Done when" items <n, ...> moved to [[<NEW>]].`, numbered as the items stood before the split, one line per new task.
+2. In `docs/tasks/<ID>.md`: remove the moved items from "Done when"; add to `deps` each new task the `Split:` line says `<ID>` must wait for; add to the end of "Notes" `- Split <date>: D<n>, ... moved to [[<NEW>]].`, with the ids the items had before the split, one line per new task.
 3. Run `node docs/.sw/sw.mjs board`.
 
 ## Common mistakes

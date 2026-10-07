@@ -17,7 +17,7 @@ Run commands from the project root.
 
 ## Steps
 
-1. **Read the task**: `docs/tasks/<ID>.md`. Number its "Done when" items in the order they are written; the verification list uses the same numbers. If the task has a plan, read only its `## Approach` and `## Verification`.
+1. **Read the task**: `docs/tasks/<ID>.md`. Its "Done when" items are `D1` to `D<n>` in the order they are written, n from the `done when:` line of `node docs/.sw/sw.mjs check <ID>`, which counts the top-level bullets; entry n of the verification list is `D<n>`. If the task has a plan, read only its `## Approach` and `## Verification`.
 2. **Take the changes from git**, never from memory:
    - uncommitted work: `git status --porcelain`;
    - work already committed: `git log --name-status --format='%h %s' --grep='^<ID>:'`, the commits whose message starts with `<ID>:`;
@@ -56,7 +56,7 @@ Run commands from the project root.
 
    Run the project check with no filter by test name, class, file or module: a filtered run leaves out what the item's tests do not reach, and can delete generated files. A project check that needs the environment and was not allowed is not run, and the guard line says so. Then read `git status --porcelain` again and compare it with the list of step 2:
    - a file shown as deleted that this task did not delete is unexpected: the item whose files or command touched it is `failed`, and its result names the file;
-   - a modified or untracked file nobody listed goes under Changes;
+   - a modified or untracked file that step 2 did not account for goes under Changes. Accounted for are the files on its list, any task's bookkeeping, and another task's files, by that task's implementer report or the user's word;
    - a non-zero exit, or a failing test, makes the item it concerns `failed`.
 
 5. **Write the section** in the format below. It is the last section of the file. If the file already has a `## Summary`, replace it whole; every verdict in the new one comes from this session. Leave the frontmatter and the other sections as they are.
@@ -116,8 +116,8 @@ Guard run: project check `<command>` (or `none defined`), exit <code>, <test cou
 
 - The four parts are always there, in this order.
 - A task that had no plan: the Plan part reads `No plan: implemented directly from the task.`, followed, when sw-do wrote an Approach note in "Notes", by that note in one or two lines.
-- An item rewritten after an accepted difference is a deviation, with or without a plan: name it under Implementation with its old wording, from the `- Changed <date>` line in the task's "Notes". When that line's reason begins `preferred:`, the item could have been built as worded: name the deviation as a preference, with the reason.
-- "Verification" is a numbered list with one entry per "Done when" item, numbered as the items are. Each entry starts with the verdict in bold: `verified`, `unverified` or `failed`. `check`, `lint` and the viewer read exactly that; an item without an entry counts as unverified.
+- An item rewritten after an accepted difference is a deviation, with or without a plan: name it under Implementation by its id, `D<n>` for a "Done when" item or `N<n>` for a note, with its old wording, both from the `- Changed <date>` line in the task's "Notes". When that line's reason begins `preferred:`, the item could have been built as worded: name the deviation as a preference, with the reason.
+- "Verification" is a numbered list with one entry per "Done when" item, numbered as the items are: entry n is `D<n>`. Each entry starts with the verdict in bold: `verified`, `unverified` or `failed`. `check`, `lint` and the viewer read exactly that; an item without an entry counts as unverified.
 - Every entry that names a command has a `falsifies:` line: the output that command would have given if the item did not hold, written for this item ("exit 1, no `status: done` line in the file"), not a general "the test would fail". An item with no command has a `reason:` instead.
 - `red:` and `mutation:` belong to items marked "(test)": `red:` on each, `mutation:` once, in the result of the item the mutation run was made on.
 - The Verification part ends with the guard line, after the numbered list. It is not an item and has no number. Its command is the last one you run to verify; steps 6 and 7 verify nothing.

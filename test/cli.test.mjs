@@ -40,7 +40,7 @@ test('next-id', () => {
 
 test('check: start and finish gates, draft plan, required review', () => {
   const root = vault();
-  assert.match(sw(root, 'check', 'T-01').stdout, /^T-01 {2}todo {2}Task T-01\ncan start: yes\ncan finish: no\nsummary: none\nplan: none\nreview: not required\n$/);
+  assert.match(sw(root, 'check', 'T-01').stdout, /^T-01 {2}todo {2}Task T-01\ncan start: yes\ncan finish: no\ndone when: 0 items\nsummary: none\nplan: none\nreview: not required\n$/);
   assert.match(sw(root, 'check', 'T-02').stdout, /can start: no {2}open deps: T-01/);
   assert.equal(JSON.parse(sw(root, 'check', 'T-01', '--json').stdout).canStart, true);
 
@@ -60,16 +60,34 @@ test('check: finishing needs a summary with every "Done when" item verified', ()
   const write = body => writeFileSync(join(root, 'docs/tasks/T-01.md'), frontmatter + body);
 
   write('## Done when\n- It works.\n\n## Summary\n\n### Verification\n1. **verified**: It works.\n   - command: `npm test`\n');
-  assert.match(sw(root, 'check', 'T-01').stdout, /\ncan finish: yes\nsummary: 1 verified\n/);
+  assert.match(sw(root, 'check', 'T-01').stdout, /\ncan finish: yes\ndone when: 1 item\nsummary: 1 verified\n/);
   assert.deepEqual(JSON.parse(sw(root, 'check', 'T-01', '--json').stdout).summary, { items: 1, verified: 1, unverified: 0, failed: 0, complete: true });
 
   write('## Done when\n- It works.\n- It is documented.\n\n## Summary\n\n### Verification\n1. **verified**: It works.\n2. **unverified**: It is documented.\n');
-  assert.match(sw(root, 'check', 'T-01').stdout, /\ncan finish: no\nsummary: 1 verified, 1 unverified\n/);
+  assert.match(sw(root, 'check', 'T-01').stdout, /\ncan finish: no\ndone when: 2 items\nsummary: 1 verified, 1 unverified\n/);
   const json = JSON.parse(sw(root, 'check', 'T-01', '--json').stdout);
   assert.equal(json.canFinish, false);
   assert.equal(json.summary.complete, false);
 
   assert.equal(JSON.parse(sw(root, 'check', 'T-02', '--json').stdout).summary, null);
+});
+
+// The skills judge a task's size and number its verification entries by this count.
+test('check: counts the top-level "Done when" items', () => {
+  const root = vault();
+  const frontmatter = '---\ntype: task\nid: T-01\ntitle: Task T-01\nstatus: todo\ndeps: []\n---\n';
+  const write = body => writeFileSync(join(root, 'docs/tasks/T-01.md'), frontmatter + body);
+  const line = () => sw(root, 'check', 'T-01').stdout.split('\n').find(l => l.startsWith('done when:'));
+
+  write('## Goal\nShip it.\n');
+  assert.equal(line(), 'done when: 0 items', 'no "Done when" section');
+
+  write('## Done when\n- First.\n  - a detail of the first, not an item\n* Second.\n+ Third.\n\n## Notes\n- A note, not an item.\n');
+  assert.equal(line(), 'done when: 3 items', 'top-level bullets of the section only');
+  assert.equal(JSON.parse(sw(root, 'check', 'T-01', '--json').stdout).doneWhen, 3);
+
+  write('## Done when\n- Only one.\n');
+  assert.equal(line(), 'done when: 1 item');
 });
 
 test('explain: dependencies, what it unblocks, area guide', () => {

@@ -22,9 +22,13 @@ Run commands from the project root. `<skill-dir>` is the directory this SKILL.md
    | `can start: n/a, status is in-progress` | this is a continuation; skip step 3 |
    | `can start: n/a, status is done` or `cancelled` | stop and ask what the user wants |
    | `plan: ... (draft, not approved)` | stop; the plan needs the user's approval (sw-plan) |
-   | `plan: none` | fine for a small task: one area, three "Done when" items or fewer, nothing open in its notes, a few files. Also fine when the task's "Notes" hold an `Approach (sw-do, ...)` note: sw-do chose the medium route. For anything else, recommend sw-plan first and let the user choose |
+   | `plan: none` | fine for a small task, by the rule below this table. Also fine when the task's "Notes" hold an `Approach (sw-do, ...)` note: sw-do chose the medium route. For anything else, recommend sw-plan first and let the user choose |
    | `review: required (...)` | remember it for step 7 |
    | `can finish: no` and `summary: none` | expected before the work: the summary is written in step 8 |
+
+   The rule for a small task, word for word as sw-do and sw-plan state it:
+
+   A task is small when its task file alone shows all four: one area, meaning its work belongs to the configured area its id prefix names and to no other (`areas` in `docs/.sw/config.json`; with one configured area, every task is in one area); three "Done when" items or fewer, as the `done when:` line of `node docs/.sw/sw.mjs check <ID>` counts them; nothing left open in its "Notes"; and the files that change, named in the task file, three or fewer. A task whose file does not show how many files change is medium at least, never small.
 
 3. **Mark it started** before any work:
    - in the frontmatter of `docs/tasks/<ID>.md`, `status: in-progress` and `started:` today;
@@ -35,17 +39,18 @@ Run commands from the project root. `<skill-dir>` is the directory this SKILL.md
    - Without a plan the list starts empty; step 6 fills it.
    - The question is asked also when the plan's approval was waived: a waiver of approval says nothing about checks. Only a standing answer in the user's first message ("the dev server may run", "none may run") replaces it, here and in step 6; a first message that gives none leaves the question to ask.
 5. **Dispatch the implementer**: the first row under "Dispatching".
-6. **Judge the report.** Its `Requirements:` list must name every "Done when" item and every scope, state or constraint item of the task; compare it with the task file.
+6. **Judge the report.** Its `Requirements:` list must name every requirement of the task by the id every role derives from position: `D1` to `D<n>` for the "Done when" items, n from the `done when:` line of step 2's `check`, and `N1` to `N<m>` for the top-level bullets of "Notes", in order. Compare it with the task file.
+   - `n/a` is for a note that asks for nothing: a record or a piece of evidence, or a line the skills write about the task's course, which is an `Approach (sw-do, ...)` note (its work is the requirements it orders) or a `Route:`, `Split` or `Changed` line. An answer the user gave, or one assumed for them, asks for something when it bears on a "Done when" item of the task: it is met when the work follows it, shown by that item's check; an answer that bears on none of them asks for nothing. A note that asks for something and comes back `n/a` is `not met`.
    - `met` needs evidence: a command or test and its result. You do not re-run it here; step 8 runs a command for every item.
    - An item marked "(test)" also needs a `red:` line in the report: the run in which its test failed before the code. Keep each such line, from the first report and from each fix round's, for step 8. A line that is missing or says `none` is no reason for a new implementer; the summary marks that item `unverified`.
    - `built, not verified`: the item's only check needs the environment and was not allowed. Ask the user once, in one question, whether each such check not yet answered may run, and add the answers to the list. Then go on either way, with no new implementer: the reviewer and your summary run what is allowed, and a check that cannot run leaves its item `unverified` in the summary and the task `in-progress`.
    - `differs` or `preferred`: the item was built differently from its wording. `differs`: it could not be built as worded. `preferred`: it could, and the implementer chose another way. Either is the user's call: show the wording, what was built and why, and ask. For a `preferred` item the question says that it could have been built as worded. A sensible reason does not accept it.
-     - Accepted: rewrite that "Done when" item in the task file to what was built, and add to "Notes" `- Changed <date>, accepted by the user: item <n> was "<old wording>"; reason: <why>.` (`<n>`: its position under "Done when"; for a `preferred` item the reason begins `preferred:`). The reviewer and the summary then read one wording.
+     - Accepted: rewrite that item in the task file to what was built, and add to the end of "Notes" `- Changed <date>, accepted by the user: D<n> was "<old wording>"; reason: <why>.` (`D<n>`: the item's id; `N<n>` for a note; for a `preferred` item the reason begins `preferred:`). The reviewer and the summary then read one wording.
      - Not accepted: a fix round whose entry is the item in the task's wording; the implementer rebuilds a `preferred` item as worded.
    - `not met`, or missing from the list: the task is not done.
 
    A fix round's report marks each entry `fixed` or `not fixed`. A `not fixed` entry goes to the user with the implementer's reason. Unless they accept what stands, no review is spent on it: go to step 8.
-7. **Review, if the task requires it.** It starts when every requirement is `met`, `built, not verified` or accepted: the review row under "Dispatching".
+7. **Review, if the task requires it.** It starts when every requirement is `met`, `n/a`, `built, not verified` or accepted: the review row under "Dispatching".
    - `Verdict: pass`: go on. Pass `important` and `minor` findings to the user in your report; they do not block.
    - `Verdict: changes needed`: a fix round with the blocking findings, then the review row again, with those findings under `Recheck:`; one that comes back `still open` is blocking. After two such rounds that still end in `changes needed`, stop and put the findings to the user.
    - Do not review the change yourself in place of the reviewer, and do not argue a blocking finding away. If you think a finding is wrong, say so to the user and let them decide.
@@ -88,11 +93,11 @@ What each dispatch gets:
 
 `Checks:` is the list of step 4, one line per check, `- <check>: allowed` or `- <check>: not allowed`; leave the block out while the list is empty. Every prompt names the project root if it is not your working directory.
 
-How to dispatch is the same for both roles: `sw-implementer` with `implementer.md`, `sw-reviewer` with `reviewer.md`, model from `models.implement` or `models.review`.
+How to dispatch is the same for both roles: `sw-implementer` with `implementer.md` and the model key `models.implement`, `sw-reviewer` with `reviewer.md` and the model key `models.review`. The key is the role's verb, not the agent's name.
 
 | Tool | How |
 | --- | --- |
-| Claude Code | the agent by name. If it is not among your agent types, use a general-purpose agent, tell it to read `<skill-dir>/../sw-config/assets/<role file>` first and follow it, and pass the model from `docs/.sw/config.json` (`models.<role>.claude`) if set |
+| Claude Code | the agent by name. If it is not among your agent types, use a general-purpose agent, tell it to read `<skill-dir>/../sw-config/assets/<role file>` first and follow it, and pass the model from `docs/.sw/config.json` if set: `models.implement.claude` for the implementer, `models.review.claude` for the reviewer |
 | Codex | spawn the custom agent `sw_implementer` or `sw_reviewer` |
 | Copilot CLI | `task` tool with the agent name |
 | No subagents available, the agent is not defined, or the project's rules forbid subagents | follow the role file yourself, in this session, and tell the user the configured model and the clean context were not used. A review done this way is weaker: say so |

@@ -1,6 +1,6 @@
 # Dry-run: run brief
 
-Source: the run brief in appendix B of [the audit source](../../docs/raw/2026-10-05-prompt-quality-audit.md), made at commit `23c12e3`. One change from the audit: the user's message is in English; the audit gave it in Turkish.
+Source: the run brief in appendix B of [the audit source](../../docs/raw/2026-10-05-prompt-quality-audit.md), made at commit `23c12e3`. Two changes from the audit: the user's message is in English, where the audit gave it in Turkish; and the scenario states that its project's `areas` names the prefix `B` Backend, with the tasks `B-20` to `B-22` in place of the audit's `T-20` to `T-22`, since this repository's `areas` names only `T`, Tasks.
 
 The brief follows an unattended `sw-run` over three tasks, as the orchestrating session. Give the prompt below to a fresh agent in the root of this repository, copied whole, and nothing else.
 
@@ -13,10 +13,10 @@ Do not read DESIGN.md, README.md or the source code: an agent following a skill 
 
 The skill under test is `skills/sw-run/SKILL.md`. Read it in full, then whatever it says to load or follow (`sw-implement`, `sw-summarize`, `sw-plan`, and the three role files in `skills/sw-config/assets/`), `AGENTS.md`, and `skills/sw-do/SKILL.md` for comparison. You may run `node docs/.sw/sw.mjs ready`, `node docs/.sw/sw.mjs check <an existing id>` and `node docs/.sw/sw.mjs stats` once each. Walk the whole run as the orchestrating session: everything before the first task, each task from picking it to closing it, then the report. Where the skill hands work to a subagent, read that role's file and note what the role is and is not told.
 
-Scenario. The user types: "sw-run: finish the ready tasks in the backend area one after another, don't ask me. Don't commit." Three tasks are ready in that area, none has a plan:
-- T-20: two "Done when" items, one area, nothing open in its notes.
-- T-21: five "Done when" items, one area, nothing open in its notes. Its implementer reports four items met and one built differently from the task's wording.
-- T-22: four "Done when" items, `review: required`. One of its items can only be checked by starting the dev server. The reviewer's first verdict is `changes needed`.
+Scenario. The scenario's project differs from this repository in one setting: `areas` in its `docs/.sw/config.json` maps the prefix `B` to Backend (this repository's maps only `T`). The user types: "sw-run: finish the ready tasks in the backend area one after another, don't ask me. Don't commit." At the start, `node docs/.sw/sw.mjs ready` lists three tasks with the prefix `B`, none with a plan:
+- B-20: two "Done when" items, one area, nothing open in its notes.
+- B-21: five "Done when" items, one area, nothing open in its notes. Its implementer reports four items met and one built differently from the task's wording.
+- B-22: four "Done when" items, `review: required`. One of its items can only be checked by starting the dev server. The reviewer's first verdict is `changes needed`.
 The working tree is clean at the start, and git works.
 
 For each place you get stuck, report one finding with:
@@ -30,12 +30,12 @@ Rules: report only what the scenarios actually reach, in the order you reach it.
 
 ## Places to check
 
-Not sent to the agent. Read each report at these places: a finding there means the text still leaves it open. Findings elsewhere are new places, worth reading, and not part of the comparison. T-21's item built differently also reaches the places of F4 and F5; the chain brief checks those.
+Not sent to the agent. Read each report at these places: a finding there means the text still leaves it open. Findings elsewhere are new places, worth reading, and not part of the comparison. B-21's item built differently also reaches the places of F4 and F5; the chain brief checks those.
 
 | Finding | What the reader must not have to guess there | Closed by |
 | --- | --- | --- |
-| F2 | T-22 has no plan and one item needs the dev server: who asks before that check runs | T-03 |
-| F8 | how T-22's reviewer learns which checks need services or data, and whether they are allowed | T-03 |
+| F2 | B-22 has no plan and one item needs the dev server: who asks before that check runs | T-03 |
+| F8 | how B-22's reviewer learns which checks need services or data, and whether they are allowed | T-03 |
 | F9 | what the fix round after `changes needed` is, and whether the same implementer or a fresh one gets it | T-03 |
 | F10 | what the second reviewer is given, and whether it rechecks the first findings | T-03 |
 | F11 | which changed files belong to each task in a run without commits | T-05 |

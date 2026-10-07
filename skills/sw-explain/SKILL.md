@@ -21,10 +21,10 @@ Run commands from the project root.
    - nothing else. Summaries from step 1 stand in for the other pages.
 4. **Answer in the user's language**, in this order, one to a few sentences each:
    - **What**: the task in plain words, without restating its title.
-   - **Why**: the reason it exists and the decision or source behind it, as `[[page]]`. If neither the task nor the page you read gives a reason, say the brain does not record one.
+   - **Why**: the reason it exists and the decision or source behind it, as `[[page]]`. If neither the task nor the page you read gives a reason, say the vault does not record one.
    - **Depends on**: each dependency with its state. A dependency listed under "depends on" must be done before the task can start; one under "soft depends on" lets it start but must be done before it can finish.
    - **Blocks**: the tasks waiting on it, and which of them become ready the moment it is done.
    - **What changes when it is done**: for the product or the user, from "Done when", and for the project, from what it unblocks.
    - **Where it stands**: state, dates, whether a plan exists, and the next step. Ready or in progress: `sw-implement <ID>` (or `sw-plan <ID>` first if there is no plan and the task is not small). Blocked: name the tasks to finish first; planning it meanwhile with `sw-plan <ID>` is allowed.
 
-Leave out a heading that has nothing to say rather than writing "none" under each. If the task file is thin (no "Goal", no "Done when"), say that this is all the brain records; do not fill the gap with guesses from the code.
+Leave out a heading that has nothing to say rather than writing "none" under each. If the task file is thin (no "Goal", no "Done when"), say that this is all the vault records; do not fill the gap with guesses from the code.

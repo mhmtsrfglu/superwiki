@@ -91,6 +91,19 @@ function levelTwoSections(lines) {
   return out;
 }
 
+// The "Done when" items are the top-level `-`, `*` or `+` bullets of the `## Done when` section; a
+// nested bullet belongs to the item above it. The skills judge a task's size by this count, `check`
+// prints it, and the summary's verification entries are numbered by it.
+function countDoneWhen(lines, sections) {
+  const section = sections.find(s => s.title === 'done when');
+  return section ? lines.slice(section.start + 1, section.end).filter(l => /^[-*+]\s+\S/.test(l)).length : 0;
+}
+
+export function doneWhenItems(body) {
+  const lines = String(body ?? '').split(/\r?\n/);
+  return countDoneWhen(lines, levelTwoSections(lines));
+}
+
 // null when the body has no `## Summary`. Otherwise the verdict counts over the "Done when" items
 // (an item without an entry is unverified), `complete` when every item is verified, the section's
 // markdown without its heading (`text`) and the body without the section (`rest`).
@@ -99,8 +112,7 @@ export function closingSummary(body) {
   const sections = levelTwoSections(lines);
   const section = sections.find(s => s.title === 'summary');
   if (!section) return null;
-  const doneWhen = sections.find(s => s.title === 'done when');
-  const items = doneWhen ? lines.slice(doneWhen.start + 1, doneWhen.end).filter(l => /^[-*+]\s+\S/.test(l)).length : 0;
+  const items = countDoneWhen(lines, sections);
   const inside = lines.slice(section.start + 1, section.end);
   const entries = new Map();
   for (const line of inside) {
@@ -163,6 +175,7 @@ export function buildVault(files) {
       started: d.started || '', finished: d.finished || '',
       // Any value asks for a separate review before the task may be done; the value names the kind.
       review: d.review ? String(d.review) : '',
+      doneWhen: doneWhenItems(p.body),
       // The closing summary's verdicts, or null while the task file has no `## Summary`.
       summary: closingSummary(p.body),
       state: null, wave: 0, dependents: [], plan: null,

@@ -35,7 +35,7 @@ This skill takes the place of their other steps.
    A question is answered only where the message speaks to it: "finish them all" sets the scope and "don't ask me" rules out questions, and neither answers one; "don't commit" answers commit, not push. Ask for the open ones in one question. When the message rules out questions, ask nothing: write one line that starts `Standing answers:` and gives all four, the user's where given and the default otherwise, and start.
 3. **Check that the run can do what was agreed**, before any task is touched:
    - `node docs/.sw/sw.mjs lint`: errors are fixed or reported first.
-   - Commits were agreed: run one harmless git command. Refused by the project's settings or the tool: say so now, and neither start the run nor look for another way to run the command.
+   - Commits were agreed: run one harmless git command. Refused by the project's settings or the tool: say so now, and neither start the run nor work around the refusal.
    - Changes in the working tree that belong to no task of this run: say what they are and ask once whether to leave them or commit them first. Questions ruled out: leave them.
 
 ## Each task
@@ -43,7 +43,7 @@ This skill takes the place of their other steps.
 1. **Next task**: `node docs/.sw/sw.mjs ready`. A task in scope that is in progress comes first, then the first ready one in scope. None left: go to "The report".
 2. **Gate**: sw-implement step 2, with sw-do's `check` table. A task whose plan is approved goes to step 5; one already in progress skips step 3.
 3. **Mark it started** (sw-implement step 3), before routing.
-4. **Route it** with sw-do's rubric, from the task file alone, and say its `Route:` line, as sw-do step 3 does. A draft plan means large.
+4. **Route it** with sw-do's rubric, from the task file alone, and say sw-do step 3's `Route:` line; a standing answer is no waiver by the user. A draft plan means large.
    - Small: step 5.
    - Medium: the `Approach (sw-do, <date>):` note into "Notes", as sw-do writes it, unless one is there; then step 5.
    - Large: sw-plan steps 4 to 6; step 6 runs whole, so the plan is `approved`.
@@ -60,7 +60,7 @@ This skill takes the place of their other steps.
 | sw-implement step 2: a draft plan stops; a task that is not small and has no plan goes to the user | step 4's route decides |
 | sw-plan step 5: the user sees the plan, answers its questions, approves it and any split | nothing is presented. Each question gets the assumed answer, unless the task file, a wiki page or a lesson says otherwise (`sw.mjs search`); the plan and any split are approved under the standing answer. A split's new task joins the queue only if it is in scope |
 | sw-plan step 6: the answers go into "Notes"; the `plan` log entry | the answers go into "Notes" once, as decisions made without the user; the log entry gets the body line `Approved under the run's standing answer.` |
-| sw-implement steps 4 and 6: the user allows checks that need the environment | the standing answer, no question: unattended means fewer questions, not more permission |
+| sw-implement steps 4 and 6: the user allows checks that need the environment | the `Standing answers:` line is the first message's standing answer, its defaults included; no question |
 | sw-implement step 6: a `differs` or `preferred` item is the user's call | one fix round, its entry the item in the task's wording |
 | sw-implement steps 11 and 12: offers, and the report | offers, open decisions and open findings go into the run's report; the rest is in each task's Summary |
 
@@ -68,8 +68,8 @@ This skill takes the place of their other steps.
 
 Every answer you give in the user's place, recorded where it was made:
 
-- on a task (a planner question answered, a plan or split approved, a `differs` or `preferred` item sent back): in its "Notes" as `- <date>, decided without the user: ...`, and in the report with its id;
-- for the run (each default in the `Standing answers:` line, working-tree changes left alone): in the report under `run` and nowhere else, even when it later decides something on a task, as a check not allowed does.
+- on a task (a planner question answered, a plan or split approved under the standing answer, a `differs` or `preferred` item sent back): in its "Notes" as `- <date>, decided without the user: ...`, and in the report with its id;
+- for the run (each default in the `Standing answers:` line, working-tree changes left alone): in the report under `run` only. A check a default disallows adds no line.
 
 ## When to stop
 
@@ -84,9 +84,9 @@ A stop on a task fires once the task is closed (step 6), with its summary and ou
 
 ## Keeping the run cheap
 
-- **A fresh subagent for every task and role**, as the clean session a skill cannot open. Only a fix round continues one: the implementer of the same task.
+- **A fresh subagent for every task and role.** Only a fix round continues one: the implementer of the same task.
 - **Prompts exactly as sw-plan step 4 and sw-implement's "Dispatching" give them.** No reading lists, no project summary, no word on commits: the role files say changes stay uncommitted and committing is yours.
-- **Reports, not files.** You read no code and no other task's files. Of a plan you read what sw-summarize reads, `## Approach` and `## Verification`, and its frontmatter when sw-plan step 6 approves it.
+- **Reports, not files.** You read no other task's files, and code only as sw-summarize's steps need it. Of a plan you read what sw-summarize reads, `## Approach` and `## Verification`, and its frontmatter when sw-plan step 6 approves it.
 - **Edit frontmatter with your edit tool**: a `sed` pattern that does not match fails silently.
 
 ## The report

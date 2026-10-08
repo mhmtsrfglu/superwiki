@@ -19,6 +19,8 @@ Run commands from the project root.
    ```
 
    Each result has the page's type and summary and the first matching line; matching log entries follow, with their first line. A page is listed when any word matches, best match first, so the tail of the list is often noise.
+
+   The vault is the only record of earlier sessions this skill can read. On Copilot the user can run `/chronicle search <words>` (Copilot CLI) or `/chronicle:search <words>` (VS Code Copilot Chat), which searches Copilot's own session store, to find an earlier session of the project and resume it; name it when the vault has no record, and say that the skill cannot run it.
 3. **Look at what changed recently**: `tail -40 docs/log.md` and `node docs/.sw/sw.mjs ready` (the "in progress" part). Work finished or under way in the same area just before the problem appeared is a suspect.
 4. **Read at most four files**, plans included, in this order of preference: `lesson` pages, `decision` pages, tasks that touched the same area (done or in progress), then the rest. Read a task's plan only if steps 2 and 3 point at that task as the cause.
 5. **Report in the user's language**, under these headings. Give the source of each claim: a page as `[[page]]`, a log entry as "log, <date>".

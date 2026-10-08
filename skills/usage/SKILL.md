@@ -46,5 +46,5 @@ So that you can answer a question about them:
 | Output | Do |
 | --- | --- |
 | `unknown command usage` | the project's `docs/.sw/sw.mjs` is older than this skill; offer to run sw:init, which updates it |
-| `no agent session record found` | say so, and name the tool's own command instead: `/cost` or `/context` (Claude Code), `/status` (Codex), `/usage` (Copilot CLI). A session started in a subfolder of the project is recorded under that folder and is not found |
+| `no agent session record found` | say so, and name the tool's own command instead: `/cost` or `/context` (Claude Code), `/status` (Codex), `/usage` (Copilot CLI). On Claude Code, beside `/cost` and `/context`, `/insights` reads the recent session transcripts on this machine and writes an HTML report of what the user works on, friction points and suggestions for using Claude Code more effectively; the user types it, the skill cannot run it. On Copilot, beside `/usage`, `/chronicle cost-tips` (Copilot CLI) or `/chronicle:cost-tips` (VS Code Copilot Chat) reads the token use of recent sessions from Copilot's session store and proposes savings; the user types it, the skill cannot run it. A session started in a subfolder of the project is recorded under that folder and is not found |
 | a note that Copilot has not written token counts yet | pass the note on; steps and tool calls are still valid |

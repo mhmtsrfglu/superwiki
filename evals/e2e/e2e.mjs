@@ -17,13 +17,13 @@ const REPO_ROOT = join(E2E_DIR, '..', '..');
 const FIXTURE = join(E2E_DIR, 'fixture');
 const OVERLAYS = join(E2E_DIR, 'overlays');
 const SCENARIOS = join(E2E_DIR, 'scenarios');
-const INIT = join(REPO_ROOT, 'skills/init/scripts/init.mjs');
-const CONFIG = join(REPO_ROOT, 'skills/config/scripts/config.mjs');
+const INIT = join(REPO_ROOT, 'skills/sw-init/scripts/init.mjs');
+const CONFIG = join(REPO_ROOT, 'skills/sw-config/scripts/config.mjs');
 const AGENTS = join(REPO_ROOT, '.claude/agents');
-const SYNC = 'node skills/config/scripts/config.mjs sync --tools claude';
+const SYNC = 'node skills/sw-config/scripts/config.mjs sync --tools claude';
 
-// A scenario's `Role:` names the agent file sw:config writes for it; a `Skill:` names the skill a
-// headless session of the user's own kind runs, from the installed plugin.
+// A scenario's `Role:` names the agent file sw-config writes for it; a `Skill:` names the skill a
+// headless session of the user's own kind runs, from the skills installed in ~/.claude/skills.
 const ROLES = { reviewer: 'sw-reviewer', implementer: 'sw-implementer' };
 const SKILLS = ['triage', 'plan', 'plan-implement', 'implement', 'verify', 'review', 'autopilot'];
 const GIT_IDENTITY = ['-c', 'user.name=e2e', '-c', 'user.email=e2e@example.com'];
@@ -34,7 +34,7 @@ const EXCLUDED = '.claude/settings.local.json';
 const HEADER = /^(Task|Role|Skill|Budget|Overlays|Files): (.*)$/;
 const CHECK_KINDS = 'sw, output, file or tree';
 // The session runs unattended in the scratch copy, says everything as stream-json events, and
-// stops at the scenario's budget. User settings bring the plugin; project settings are the copy's.
+// stops at the scenario's budget. The skills come from ~/.claude/skills; project settings are the copy's.
 const CLAUDE_ARGS = ['--output-format', 'stream-json', '--verbose', '--dangerously-skip-permissions', '--permission-prompts', 'none', '--setting-sources', 'user,project'];
 const EVENTS_LIMIT = 256 * 1024 * 1024;
 
@@ -229,7 +229,7 @@ export function prepare(ref, dir, { agents = AGENTS } = {}) {
   mkdirSync(copy, { recursive: true });
   cpSync(FIXTURE, copy, { recursive: true, filter: keepOutOfCopy });
   exec(process.execPath, [INIT, '--root', copy, '--tasks'], copy);
-  // The plugin ships no agents: the copy carries the ones a session dispatches, from the checkout's role texts.
+  // No install ships agents: the copy carries the ones a session dispatches, from the checkout's role texts.
   exec(process.execPath, [CONFIG, 'sync', '--root', copy, '--tools', 'claude'], copy);
   git(copy, ['-c', 'init.defaultBranch=main', 'init', '-q']);
   mkdirSync(join(copy, '.git/info'), { recursive: true });
@@ -362,7 +362,7 @@ const USAGE = `usage: node evals/e2e/e2e.mjs prepare <scenario> --to <dir> [--ag
 
 prepare  copies the fixture to <dir> (new or empty), gives it a vault, the agent files of the checkout's
          role texts and one commit, lays the scenario's overlays over it uncommitted, and prints the
-         agent type to dispatch (Agent: sw-<role>) or the skill to run (Skill: sw:<name>) and the prompt;
+         agent type to dispatch (Agent: sw-<role>) or the skill to run (Skill: sw-<name>) and the prompt;
          a Role: scenario refuses to run while the agent file is missing (--agents: where the files are;
          default .claude/agents, written by "${SYNC}")
 run      starts "claude -p" in the prepared copy of a Skill: scenario, unattended, with the scenario's
@@ -413,7 +413,7 @@ export function main(argv, out = process.stdout, err = process.stderr) {
     const options = parseArgs(argv);
     if (options.command === 'prepare') {
       const { agent, skill, prompt } = prepare(options.positional[0], options.to, { agents: options.agents });
-      out.write(`${agent ? `Agent: ${agent}` : `Skill: sw:${skill}`}\n\n${prompt}\n`);
+      out.write(`${agent ? `Agent: ${agent}` : `Skill: sw-${skill}`}\n\n${prompt}\n`);
       return 0;
     }
     if (options.command === 'run') {

@@ -5,7 +5,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-const init = new URL('../skills/init/scripts/init.mjs', import.meta.url).pathname;
+const init = new URL('../skills/sw-init/scripts/init.mjs', import.meta.url).pathname;
 const sw = (root, ...args) => spawnSync('node', [join(root, 'docs/.sw/sw.mjs'), ...args], { encoding: 'utf8', cwd: root });
 const index = root => readFileSync(join(root, 'docs/index.md'), 'utf8');
 

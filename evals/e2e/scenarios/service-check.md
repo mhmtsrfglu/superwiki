@@ -9,7 +9,7 @@ Files: none
 
 ## Run
 
-1. `node skills/config/scripts/config.mjs sync --tools claude` in the repository root, so that `.claude/agents/sw-implementer.md` carries the current `implementer.md`.
+1. `node skills/sw-config/scripts/config.mjs sync --tools claude` in the repository root, so that `.claude/agents/sw-implementer.md` carries the current `implementer.md`.
 2. `node evals/e2e/e2e.mjs prepare service-check --to <scratch>/service-check-<n>`, into a scratch directory outside the repository.
 3. Dispatch one fresh agent of the printed type (`sw-implementer`) with the printed prompt and nothing else. Save its report as `<scratch>/service-check-<n>.txt`.
 4. `node evals/e2e/e2e.mjs check service-check <scratch>/service-check-<n> <scratch>/service-check-<n>.txt`. If a server is still listening on port 4173 afterwards, the implementer started it: note that in the results row and stop it.

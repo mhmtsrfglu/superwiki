@@ -128,7 +128,7 @@ function check(ctx) {
   if (t.error) return { error: t.error };
   const openSoftDeps = t.openSoftDeps.filter(id => taskOf(ctx.vault, id));
   const canStart = t.status === 'todo' && !t.openDeps.length;
-  // Finishing needs a closing summary in which every "Done when" item is verified (sw:verify).
+  // Finishing needs a closing summary in which every "Done when" item is verified (sw-verify).
   const canFinish = !t.openDeps.length && !t.openSoftDeps.length && !!t.summary?.complete;
   const closing = t.summary && { items: t.summary.items, verified: t.summary.verified, unverified: t.summary.unverified, failed: t.summary.failed, complete: t.summary.complete };
   const verdicts = closing && ['verified', 'unverified', 'failed'].filter(verdict => closing[verdict]).map(verdict => `${closing[verdict]} ${verdict}`).join(', ');
@@ -254,9 +254,9 @@ function nextIdCommand({ vault, args }) {
 
 // The task list in index.md is a view of the task files; this writes it again from them.
 function indexCommand({ docs, vault }) {
-  if (!existsSync(join(docs, 'tasks'))) return { error: 'this vault has no task module (docs/tasks); sw:init --tasks adds it', code: 1 };
+  if (!existsSync(join(docs, 'tasks'))) return { error: 'this vault has no task module (docs/tasks); sw-init --tasks adds it', code: 1 };
   const path = join(docs, 'index.md');
-  if (!existsSync(path)) return { error: 'docs/index.md is missing; run sw:init', code: 1 };
+  if (!existsSync(path)) return { error: 'docs/index.md is missing; run sw-init', code: 1 };
   const before = readFileSync(path, 'utf8');
   const after = indexWithBoard(before, taskBoard(vault));
   const changed = after !== before;
@@ -355,7 +355,7 @@ function runServer(docs) {
     const viewer = join(docs, 'viewer.html');
     if (path === '/' || path === '/viewer.html') {
       if (existsSync(viewer)) send('text/html', readFileSync(viewer));
-      else res.writeHead(404).end('docs/viewer.html is missing; run sw:init');
+      else res.writeHead(404).end('docs/viewer.html is missing; run sw-init');
     } else if (path === '/.sw/data.js') {
       send('text/javascript', dataScript({ ...vaultData(docs), live: true }));
     } else if (path === '/.sw/ping') {
@@ -420,8 +420,8 @@ const COMMANDS = {
   snapshot: { run: snapshot, needsVault: false },
   serve: { run: serve, needsVault: false },
 };
-// The names `index` and `usage` had before the skills were renamed sw:index and sw:usage; kept so
-// that older skill texts and scripts keep working. The help lists the new names only.
+// The names the `index` and `usage` commands had before they were named after their skills; kept
+// so that older skill texts and scripts keep working. The help lists the new names only.
 COMMANDS.board = COMMANDS.index;
 COMMANDS.stats = COMMANDS.usage;
 
@@ -462,7 +462,7 @@ async function main(argv) {
   }
   const docs = docsDir(flags);
   if (!existsSync(docs)) {
-    console.error(`no docs folder at ${docs}; run sw:init or pass --docs`);
+    console.error(`no docs folder at ${docs}; run sw-init or pass --docs`);
     return 2;
   }
   const result = await entry.run({ docs, args, flags, vault: entry.needsVault ? loadVault(docs) : null });

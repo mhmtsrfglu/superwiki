@@ -22,7 +22,7 @@ const MESSAGES = [
   '',
   '| # | Message | expect |',
   '| --- | --- | --- |',
-  '| 1 | do T-05 | sw:alpha |',
+  '| 1 | do T-05 | sw-alpha |',
   '| 2 | fix the typo | none |',
   '| 3 | review T-05 | - |',
   '',
@@ -32,7 +32,7 @@ const AGENTS = [
   '# Agent instructions',
   '',
   'Outside text before the block.',
-  '<!-- sw:start (managed by sw:init) -->',
+  '<!-- sw:start (managed by sw-init) -->',
   '## Superwiki',
   'Inside the block.',
   '<!-- sw:end -->',
@@ -42,17 +42,15 @@ const AGENTS = [
 
 function writeSkill(root, name, description) {
   mkdirSync(join(root, 'skills', name), { recursive: true });
-  writeFileSync(join(root, 'skills', name, 'SKILL.md'), `---\nname: ${name}\ndescription: ${description}\n---\n\n# sw:${name}\n`);
+  writeFileSync(join(root, 'skills', name, 'SKILL.md'), `---\nname: ${name}\ndescription: ${description}\n---\n\n# ${name}\n`);
 }
 
-// A repository with the plugin manifest, two skills (written out of order), an AGENTS.md block and
-// three messages. The skills are listed as the plugin names them: sw:<name>.
+// A repository with two skills (written out of order), an AGENTS.md block and three messages. The
+// skills are listed by their folder names, sw-<name>, as every agent shows them.
 function repo() {
   const root = mkdtempSync(join(tmpdir(), 'sw-evals-'));
-  mkdirSync(join(root, '.claude-plugin'), { recursive: true });
-  writeFileSync(join(root, '.claude-plugin/plugin.json'), JSON.stringify({ name: 'sw' }));
-  writeSkill(root, 'beta', 'Use when beta things happen.');
-  writeSkill(root, 'alpha', 'Use when alpha things happen.');
+  writeSkill(root, 'sw-beta', 'Use when beta things happen.');
+  writeSkill(root, 'sw-alpha', 'Use when alpha things happen.');
   mkdirSync(join(root, 'evals/routing'), { recursive: true });
   writeFileSync(join(root, 'evals/routing/messages.md'), MESSAGES);
   writeFileSync(join(root, 'AGENTS.md'), AGENTS);
@@ -65,7 +63,7 @@ function answerFile(dir, name, lines) {
   return path;
 }
 
-const MATCHING = ['1 | sw:alpha | - | sure | asked to do it', '2 | none | - | sure | small fix', '3 | none | sw:beta | unsure | no review skill'];
+const MATCHING = ['1 | sw-alpha | - | sure | asked to do it', '2 | none | - | sure | small fix', '3 | none | sw-beta | unsure | no review skill'];
 
 function probeFrom(root, competing) {
   return buildProbe({
@@ -76,17 +74,17 @@ function probeFrom(root, competing) {
   });
 }
 
-test('the probe lists the skills sorted under the plugin name, the rules block and the messages, without expectations', () => {
+test('the probe lists the skills sorted by their folder names, the rules block and the messages, without expectations', () => {
   const probe = probeFrom(repo());
-  const skillLines = probe.split('\n').filter(line => line.startsWith('- sw:'));
-  assert.deepEqual(skillLines, ['- sw:alpha: Use when alpha things happen.', '- sw:beta: Use when beta things happen.']);
+  const skillLines = probe.split('\n').filter(line => line.startsWith('- sw-'));
+  assert.deepEqual(skillLines, ['- sw-alpha: Use when alpha things happen.', '- sw-beta: Use when beta things happen.']);
   assert.match(probe, /## Project rules\n\n## Superwiki\nInside the block\.\n/);
   assert.doesNotMatch(probe, /Outside text|sw:start|sw:end/);
   assert.match(probe, /Reply with exactly 3 lines/);
   assert.doesNotMatch(probe, /exactly 36/);
   assert.match(probe, /## Messages\n\n1\. do T-05\n2\. fix the typo\n3\. review T-05\n$/);
   assert.doesNotMatch(probe, /\bexpect/i);
-  assert.doesNotMatch(probe, /\| sw:alpha \||\| none \||\| - \|/);
+  assert.doesNotMatch(probe, /\| sw-alpha \||\| none \||\| - \|/);
   assert.doesNotMatch(probe, /## Other installed skills/);
 });
 
@@ -101,12 +99,12 @@ test('a competing file appears verbatim under its heading, before the messages',
 
 test('rulesBlock throws when a marker is missing', () => {
   assert.throws(() => rulesBlock(AGENTS.replace('<!-- sw:end -->', '')), /sw:end/);
-  assert.throws(() => rulesBlock(AGENTS.replace('<!-- sw:start (managed by sw:init) -->', '')), /sw:start/);
+  assert.throws(() => rulesBlock(AGENTS.replace('<!-- sw:start (managed by sw-init) -->', '')), /sw:start/);
 });
 
 test('parseMessages reads the expectations and rejects gaps in the numbering', () => {
   assert.deepEqual(parseMessages(MESSAGES), [
-    { n: 1, message: 'do T-05', expect: 'sw:alpha' },
+    { n: 1, message: 'do T-05', expect: 'sw-alpha' },
     { n: 2, message: 'fix the typo', expect: 'none' },
     { n: 3, message: 'review T-05', expect: null },
   ]);
@@ -114,9 +112,9 @@ test('parseMessages reads the expectations and rejects gaps in the numbering', (
 });
 
 test('parseAnswers ignores fences and prose and strips backticks', () => {
-  const answers = parseAnswers(['Here are my answers:', '```', '1 | `sw:alpha` | `none` | unsure | asked to do it', '```'].join('\n'));
+  const answers = parseAnswers(['Here are my answers:', '```', '1 | `sw-alpha` | `none` | unsure | asked to do it', '```'].join('\n'));
   assert.deepEqual([...answers.keys()], [1]);
-  assert.deepEqual(answers.get(1), { pick: 'sw:alpha', runnerUp: 'none', sure: false, reason: 'asked to do it' });
+  assert.deepEqual(answers.get(1), { pick: 'sw-alpha', runnerUp: 'none', sure: false, reason: 'asked to do it' });
 });
 
 test('three matching answer sets agree everywhere and exit 0', () => {
@@ -125,7 +123,7 @@ test('three matching answer sets agree everywhere and exit 0', () => {
   const result = score(parseMessages(MESSAGES), files.map(() => parseAnswers(MATCHING.join('\n'))));
   assert.ok(result.rows.every(row => row.agree));
   const report = formatScore(result);
-  assert.match(report, /\| 1 \| sw:alpha \| sw:alpha, sw:alpha, sw:alpha \| yes \| 0 \|/);
+  assert.match(report, /\| 1 \| sw-alpha \| sw-alpha, sw-alpha, sw-alpha \| yes \| 0 \|/);
   assert.match(report, /\| 3 \| - \| none, none, none \| yes \| 3 \|/);
   assert.match(report, /^repetitions: 3$/m);
   assert.match(report, /^agreement: 3 of 3 messages$/m);
@@ -139,23 +137,23 @@ test('three matching answer sets agree everywhere and exit 0', () => {
 
 test('a repetition that differs on one message is listed and exits 1', () => {
   const root = repo();
-  const differing = ['1 | sw:beta | sw:alpha | unsure | maybe beta', ...MATCHING.slice(1)];
+  const differing = ['1 | sw-beta | sw-alpha | unsure | maybe beta', ...MATCHING.slice(1)];
   const files = [answerFile(root, 'a1.txt', MATCHING), answerFile(root, 'a2.txt', differing), answerFile(root, 'a3.txt', MATCHING)];
   const cli = routing('score', '--root', root, ...files);
   assert.equal(cli.status, 1, cli.stderr);
-  assert.match(cli.stdout, /\| 1 \| sw:alpha \| sw:alpha, sw:beta, sw:alpha \| no \| 1 \|/);
+  assert.match(cli.stdout, /\| 1 \| sw-alpha \| sw-alpha, sw-beta, sw-alpha \| no \| 1 \|/);
   assert.match(cli.stdout, /^agreement: 2 of 3 messages$/m);
   assert.match(cli.stdout, /^expectations: 1 of 2 messages matched in every repetition$/m);
-  assert.match(cli.stdout, /^differs:\n- 1: expected sw:alpha, got sw:beta in 1 of 3$/m);
+  assert.match(cli.stdout, /^differs:\n- 1: expected sw-alpha, got sw-beta in 1 of 3$/m);
 });
 
 test('differing picks on a message without an expectation are not a failure, but they do not agree', () => {
   const root = repo();
-  const other = [...MATCHING.slice(0, 2), '3 | sw:beta | none | unsure | could be beta'];
+  const other = [...MATCHING.slice(0, 2), '3 | sw-beta | none | unsure | could be beta'];
   const files = [answerFile(root, 'a1.txt', MATCHING), answerFile(root, 'a2.txt', other), answerFile(root, 'a3.txt', MATCHING)];
   const cli = routing('score', '--root', root, ...files);
   assert.equal(cli.status, 0, cli.stderr);
-  assert.match(cli.stdout, /\| 3 \| - \| none, sw:beta, none \| no \| 3 \|/);
+  assert.match(cli.stdout, /\| 3 \| - \| none, sw-beta, none \| no \| 3 \|/);
   assert.match(cli.stdout, /^agreement: 2 of 3 messages$/m);
   assert.match(cli.stdout, /^differs: none$/m);
 });
@@ -185,11 +183,18 @@ test('a duplicate answer, no answer line or an unknown number exits 2', () => {
   assert.equal(routing('rank').status, 2);
 });
 
-test('probe on the real repository lists the 19 skills as sw:<name>', () => {
+test('a skill whose name: differs from its folder is refused: an agent would show the folder name', () => {
+  const root = repo();
+  writeSkill(root, 'sw-gamma', 'Use when gamma things happen.');
+  writeFileSync(join(root, 'skills/sw-gamma/SKILL.md'), '---\nname: gamma\ndescription: Use when gamma things happen.\n---\n');
+  assert.throws(() => readSkills(root), /sw-gamma\/SKILL\.md is named gamma, not sw-gamma/);
+});
+
+test('probe on the real repository lists the 19 skills by their folder names, sw-<name>', () => {
   const cli = routing('probe');
   assert.equal(cli.status, 0, cli.stderr);
-  assert.equal(cli.stdout.split('\n').filter(line => line.startsWith('- sw:')).length, 19);
-  assert.match(cli.stdout, /^- sw:review: /m);
-  assert.doesNotMatch(cli.stdout, /^- sw:sw-/m);
+  assert.equal(cli.stdout.split('\n').filter(line => line.startsWith('- sw-')).length, 19);
+  assert.match(cli.stdout, /^- sw-review: /m);
+  assert.doesNotMatch(cli.stdout, /^- sw:/m);
   assert.match(cli.stdout, /Reply with exactly 40 lines/);
 });

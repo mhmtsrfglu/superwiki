@@ -38,7 +38,7 @@ jobs:
         id: version
         run: |
           npm version "${{ inputs.bump }}" --no-git-tag-version
-          echo "version=$(node scripts/sync-version.mjs)" >> "$GITHUB_OUTPUT"
+          echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
           node scripts/build.mjs
 
       - name: Commit and tag

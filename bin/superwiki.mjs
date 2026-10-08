@@ -1,10 +1,11 @@
 #!/usr/bin/env node
-// Installs Superwiki for each coding agent. Claude Code gets the plugin `sw`, installed through
-// Claude Code's own plugin CLI from the GitHub marketplace or, with --link, from this checkout; it
-// names the skills sw:<name>. Codex, Copilot CLI and the other agents that read ~/.agents/skills
-// have no namespace, so they get a copy of each skill as sw-<name>, in the home folder for every
-// project on this machine or in one project, committed with the repository. `--link` links the
-// copies to this checkout instead, which is what install.sh does for a git clone.
+// Installs Superwiki for each coding agent: a copy of each skill folder, named sw-<name> as it is
+// in this checkout, in the folder the agent reads skills from, in the home folder for every project
+// on this machine or in one project, committed with the repository. `--link` links the folders to
+// this checkout instead, which is what install.sh does for a git clone. Every agent invokes the
+// skills by the folder name: /sw-plan in Claude Code and Copilot, $sw-plan in Codex.
+// Earlier versions installed Claude Code's skills as the plugin sw@superwiki; installing or
+// uninstalling for claude removes that plugin and its marketplace, so no session lists both.
 import { spawnSync } from 'node:child_process';
 import { existsSync, lstatSync, readlinkSync, realpathSync, mkdirSync, readdirSync, rmSync, cpSync, symlinkSync, writeFileSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -16,35 +17,30 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const skillsDir = join(root, 'skills');
 const TARGETS = ['claude', 'codex', 'copilot', 'global'];
 const MARKER = '.sw-installed';
-// Claude Code's plugin, by its id in the marketplace, and where the marketplace comes from.
-const PLUGIN = 'sw@superwiki';
-const MARKETPLACE = 'mhmtsrfglu/superwiki';
-// The name a copied skill carries where there is no namespace.
-const COPY_PREFIX = 'sw-';
+// The Claude Code plugin of earlier versions, by its id, and the marketplace it came from.
+const OLD_PLUGIN = 'sw@superwiki';
+const OLD_MARKETPLACE = 'superwiki';
 
 const HELP = `Usage: superwiki install [options] <target>...
        superwiki uninstall [options] <target>...
 
 Targets:
-  claude     the plugin ${PLUGIN}, via claude plugin install   Claude Code
-  codex      ~/.agents/skills                                Codex CLI
-  copilot    ~/.copilot/skills                               GitHub Copilot CLI
-  global     ~/.agents/skills                                the shared folder: Codex, Copilot CLI
-                                                             and other agents that read it
-                                                             (Claude Code does not)
+  claude     ~/.claude/skills     Claude Code
+  codex      ~/.agents/skills     Codex CLI
+  copilot    ~/.copilot/skills    GitHub Copilot CLI
+  global     ~/.agents/skills     the shared folder: Codex, Copilot CLI and other agents
+                                  that read it (Claude Code does not)
   all        claude + codex + copilot
 
-Claude Code invokes the skills as sw:<name> (sw:plan, sw:implement). Codex and Copilot CLI have
-no namespace: there each skill is a copy named sw-<name>.
+Each skill is a folder named sw-<name>, and every agent invokes it by that name:
+/sw-plan in Claude Code and Copilot, $sw-plan in Codex.
 
 Options:
   --global         use your home folder: the skills serve every project on this machine
-  --project <dir>  use that project instead: the plugin at project scope for claude
-                   (.claude/settings.json), .agents/skills for the others; committed with the
-                   repository, the skills reach cloud agents too
-  --link           link the copies to this copy of Superwiki instead of copying them, and add this
-                   copy as the plugin's marketplace (for a git clone: updating the clone then
-                   updates every agent)
+  --project <dir>  use that project instead: .claude/skills for claude, .agents/skills for the
+                   others; committed with the repository, the skills reach cloud agents too
+  --link           link the skill folders to this copy of Superwiki instead of copying them
+                   (for a git clone: updating the clone then updates every agent)
   --force          replace or remove a skill folder that Superwiki did not install
   -v, --version    print the version
   -h, --help       show this help
@@ -52,6 +48,10 @@ Options:
 install asks "home folder or this project" when it runs in a terminal and neither --global nor
 --project is given; outside a terminal it uses the home folder. uninstall never asks: it works
 on the home folder unless --project is given.
+
+For claude, install and uninstall also remove the plugin ${OLD_PLUGIN} and its marketplace
+${OLD_MARKETPLACE}, which earlier versions installed, at the same scope (user, or project with
+--project), through the claude command when it is on PATH.
 
 Examples:
   npx superwiki install claude
@@ -61,7 +61,7 @@ Examples:
   npx superwiki uninstall copilot
 
 Run the same command again after a new release to update. Then start a new agent session
-and run sw:init in a project.`;
+and run sw-init in a project.`;
 
 const argv = process.argv.slice(2);
 const fail = (msg, code = 2) => { console.error(msg); process.exit(code); };
@@ -124,38 +124,36 @@ if (command === 'install' && link && project) {
   console.error('warning: --link into a project: the links point into this machine and will not work in a clone or a cloud session; leave --link out to copy');
 }
 
-// ---------- Claude Code: the plugin ----------
-// Claude Code loads the plugin from its marketplace; its own CLI registers the marketplace and
-// installs or removes the plugin at user or project scope. Writing the settings by hand would
-// enable a plugin that is never fetched. Returns the exit status.
-function pluginCommands() {
+// ---------- Claude Code: the plugin of earlier versions ----------
+// Its skills would be listed beside the copies, under the old names, so it goes before the copies
+// come in, through Claude Code's own CLI and at the scope the copies go to. Nothing installed, or no
+// claude command, is the usual case and says nothing. Returns the exit status.
+function removeOldPlugin() {
   const scope = project ? 'project' : 'user';
-  if (command === 'uninstall') return [['plugin', 'uninstall', PLUGIN, '--scope', scope]];
-  const source = link ? root : MARKETPLACE;
-  return [['plugin', 'marketplace', 'add', source, '--scope', scope], ['plugin', 'install', PLUGIN, '--scope', scope]];
-}
-
-function runPlugin() {
-  console.log(`claude: the plugin ${PLUGIN}, ${project ? `project scope (${project})` : 'user scope'}`);
-  for (const args of pluginCommands()) {
-    const run = spawnSync('claude', args, { stdio: 'inherit', cwd: project || process.cwd() });
-    if (run.error?.code === 'ENOENT') {
-      console.error(`  claude was not found on PATH. Install Claude Code, or run there: claude ${args.join(' ')}`);
-      return 1;
-    }
-    if (run.status !== 0) {
-      console.error(`  claude ${args.join(' ')} failed (exit ${run.status})`);
-      return 1;
-    }
+  const steps = [
+    { what: `plugin ${OLD_PLUGIN}`, args: ['plugin', 'uninstall', OLD_PLUGIN, '--scope', scope] },
+    { what: `marketplace ${OLD_MARKETPLACE}`, args: ['plugin', 'marketplace', 'remove', OLD_MARKETPLACE, '--scope', scope] },
+  ];
+  let result = 0;
+  for (const { what, args } of steps) {
+    const run = spawnSync('claude', args, { encoding: 'utf8', cwd: project || process.cwd() });
+    if (run.error?.code === 'ENOENT') return 0;
+    if (run.status === 0) { console.log(`  removed  ${what}`); continue; }
+    const said = `${run.stdout ?? ''}${run.stderr ?? ''}`.trim();
+    if (/not found/i.test(said)) continue;
+    console.error(`  could not remove the earlier ${what} (exit ${run.status ?? run.signal}${said ? `: ${said.split('\n').pop()}` : ''}); run by hand: claude ${args.join(' ')}`);
+    result = 1;
   }
-  return 0;
+  return result;
 }
 
-// ---------- The other agents: copies ----------
+// ---------- Every agent: a copy or a link of each skill folder ----------
 
-const destFor = t => (project
-  ? join(project, '.agents/skills')
-  : join(homedir(), t === 'copilot' ? '.copilot/skills' : '.agents/skills'));
+function destFor(target) {
+  if (target === 'claude') return join(project || homedir(), '.claude/skills');
+  if (project) return join(project, '.agents/skills');
+  return join(homedir(), target === 'copilot' ? '.copilot/skills' : '.agents/skills');
+}
 
 const exists = p => { try { lstatSync(p); return true; } catch { return false; } };
 // Ours: a link that ends up in this copy's skills folder, or a copy carrying the marker file.
@@ -167,46 +165,42 @@ function isOurs(p, skill) {
   return existsSync(join(p, MARKER));
 }
 
-// A copy of a skill folder whose SKILL.md carries the copy's name, so the agent lists it as such.
-function copySkill(from, to, name) {
+// A copy of a skill folder, unchanged, plus the marker that makes it Superwiki's.
+function copySkill(from, to) {
   cpSync(from, to, { recursive: true });
-  const skillFile = join(to, 'SKILL.md');
-  writeFileSync(skillFile, readFileSync(skillFile, 'utf8').replace(/^name: .*$/m, `name: ${name}`));
   writeFileSync(join(to, MARKER), '');
 }
 
 const skills = readdirSync(skillsDir).filter(n => existsSync(join(skillsDir, n, 'SKILL.md'))).sort();
 let status = 0;
-if (targets.includes('claude') && runPlugin() !== 0) status = 1;
-
 const seen = new Set();
-for (const target of targets.filter(t => t !== 'claude')) {
+for (const target of targets) {
   const dest = destFor(target);
-  if (seen.has(dest)) continue;   // codex and global share a folder
+  if (seen.has(dest)) continue;   // codex and global share a folder, and so do codex and copilot in a project
   seen.add(dest);
   console.log(`${target}: ${dest}`);
+  if (target === 'claude' && removeOldPlugin() !== 0) status = 1;
   if (command === 'install') mkdirSync(dest, { recursive: true });
   for (const skill of skills) {
-    const name = COPY_PREFIX + skill;
-    const path = join(dest, name);
+    const path = join(dest, skill);
     if (exists(path)) {
       if (!isOurs(path, skill) && !force) {
-        if (command === 'install') { console.log(`  skipped  ${name} (a different ${name} is already there; --force replaces it)`); status = 1; }
-        else console.log(`  kept     ${name} (not installed by Superwiki; --force removes it)`);
+        if (command === 'install') { console.log(`  skipped  ${skill} (a different ${skill} is already there; --force replaces it)`); status = 1; }
+        else console.log(`  kept     ${skill} (not installed by Superwiki; --force removes it)`);
         continue;
       }
       rmSync(path, { recursive: true, force: true });
-      if (command === 'uninstall') console.log(`  removed  ${name}`);
+      if (command === 'uninstall') console.log(`  removed  ${skill}`);
     }
     if (command === 'uninstall') continue;
-    if (link) { symlinkSync(join(skillsDir, skill), path); console.log(`  linked   ${name}`); }
-    else { copySkill(join(skillsDir, skill), path, name); console.log(`  copied   ${name}`); }
+    if (link) { symlinkSync(join(skillsDir, skill), path); console.log(`  linked   ${skill}`); }
+    else { copySkill(join(skillsDir, skill), path); console.log(`  copied   ${skill}`); }
   }
 }
 
 if (command === 'install') {
   const major = Number(process.versions.node.split('.')[0]);
   if (major < 18) console.error(`warning: Node ${major} found; the Superwiki scripts need Node 18 or newer`);
-  console.log('\nStart a new agent session, then run sw:init in a project.');
+  console.log('\nStart a new agent session, then run sw-init in a project: /sw-init in Claude Code and Copilot, $sw-init in Codex.');
 }
 process.exit(status);

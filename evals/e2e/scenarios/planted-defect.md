@@ -9,7 +9,7 @@ Files: src/paginate.mjs, test/paginate.test.mjs
 
 ## Run
 
-1. `node skills/config/scripts/config.mjs sync --tools claude` in the repository root, so that `.claude/agents/sw-reviewer.md` carries the current `reviewer.md`.
+1. `node skills/sw-config/scripts/config.mjs sync --tools claude` in the repository root, so that `.claude/agents/sw-reviewer.md` carries the current `reviewer.md`.
 2. `node evals/e2e/e2e.mjs prepare planted-defect --to <scratch>/planted-defect-<n>`, once per repetition, into a scratch directory outside the repository.
 3. Dispatch one fresh agent of the printed type (`sw-reviewer`) with the printed prompt and nothing else. Save its report as `<scratch>/planted-defect-<n>.txt`.
 4. `node evals/e2e/e2e.mjs check planted-defect <scratch>/planted-defect-<n> <scratch>/planted-defect-<n>.txt`.

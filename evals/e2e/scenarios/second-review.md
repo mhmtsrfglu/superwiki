@@ -9,7 +9,7 @@ Files: src/paginate.mjs, test/paginate.test.mjs
 
 ## Run
 
-1. `node skills/config/scripts/config.mjs sync --tools claude` in the repository root, so that `.claude/agents/sw-reviewer.md` carries the current `reviewer.md`.
+1. `node skills/sw-config/scripts/config.mjs sync --tools claude` in the repository root, so that `.claude/agents/sw-reviewer.md` carries the current `reviewer.md`.
 2. `node evals/e2e/e2e.mjs prepare second-review --to <scratch>/second-review-<n>`, into a scratch directory outside the repository.
 3. Dispatch one fresh agent of the printed type (`sw-reviewer`) with the printed prompt and nothing else; the prompt ends with the `Recheck:` block below. Save its report as `<scratch>/second-review-<n>.txt`.
 4. `node evals/e2e/e2e.mjs check second-review <scratch>/second-review-<n> <scratch>/second-review-<n>.txt`.

@@ -14,7 +14,7 @@ const sw = (root, ...args) => spawnSync('node', [join(root, 'docs/.sw/sw.mjs'), 
 const git = (root, ...args) => spawnSync('git', args, { encoding: 'utf8', cwd: root }).stdout;
 const shipped = name => readFileSync(join(E2E, 'scenarios', `${name}.md`), 'utf8');
 
-// A tmp root with a scratch area and a stub agent file for each role sw:config would write.
+// A tmp root with a scratch area and a stub agent file for each role sw-config would write.
 function scratch(...roles) {
   const root = mkdtempSync(join(tmpdir(), 'sw-e2e-'));
   const agents = join(root, 'agents');
@@ -171,7 +171,7 @@ test('the shipped scenarios parse and say what they need', () => {
     for (const overlay of scenario.overlays) assert.ok(existsSync(join(E2E, 'overlays', overlay)), `${name}: overlay ${overlay}`);
     if (SKILLS[name]) {
       assert.equal(scenario.skill, SKILLS[name], name);
-      assert.match(scenario.prompt, new RegExp(`^/sw:${SKILLS[name]}\\b`), `${name} invokes its skill`);
+      assert.match(scenario.prompt, new RegExp(`^/sw-${SKILLS[name]}\\b`), `${name} invokes its skill`);
       assert.ok(scenario.budget > 0, `${name} has a budget`);
       assert.ok(scenario.pass.some(row => row.kind === 'output' || row.kind === 'file'), `${name} searches the output or the vault`);
     } else {
@@ -244,7 +244,7 @@ test('prepare refuses to run without the agent file, on a used directory and on 
   const { root, agents, copy } = scratch('implementer');
   const missing = cli('prepare', 'planted-defect', '--to', copy, '--agents', agents);
   assert.equal(missing.code, 2);
-  assert.match(missing.err, /sw-reviewer\.md is missing; run "node skills\/config\/scripts\/config\.mjs sync --tools claude"/);
+  assert.match(missing.err, /sw-reviewer\.md is missing; run "node skills\/sw-config\/scripts\/config\.mjs sync --tools claude"/);
   assert.ok(!existsSync(copy), 'nothing is copied before the check');
 
   const differs = prepare('differs-item', copy, { agents });
@@ -263,7 +263,7 @@ test('prepare of a Skill: scenario needs no agent file and prints the skill', ()
   const { copy } = scratch();
   const { code, out, err } = cli('prepare', 'triage-report', '--to', copy);
   assert.equal(code, 0, err);
-  assert.match(out, /^Skill: sw:triage\n\n\/sw:triage /);
+  assert.match(out, /^Skill: sw-triage\n\n\/sw-triage /);
   assert.ok(!out.includes('<copy>'), 'placeholders are filled');
   assert.deepEqual(git(copy, 'status', '--porcelain').trim().split('\n').sort(), ['?? src/paginate.mjs', '?? test/paginate.test.mjs']);
   assert.ok(existsSync(join(copy, '.claude/agents/sw-planner.md')));
@@ -319,7 +319,7 @@ test('a file row searches a file of the copy; a missing file fails matches and p
   writeFileSync(report, 'Approach: one server file.\n');
   const scenario = join(root, 'files.md');
   writeFileSync(scenario, [
-    'Task: T-03', 'Skill: plan', 'Budget: 1', '', '## Run', '', 'x', '', '## Prompt', '', '```text', '/sw:plan T-03', '```', '', '## Pass', '',
+    'Task: T-03', 'Skill: plan', 'Budget: 1', '', '## Run', '', 'x', '', '## Prompt', '', '```text', '/sw-plan T-03', '```', '', '## Pass', '',
     '| check | expect |', '| --- | --- |',
     '| `file docs/tasks/T-03.md` | `matches /^status: todo$/m` |',
     '| `file docs/tasks/T-03.md` | `lacks /\\(test\\)/` |',
@@ -359,7 +359,7 @@ test('run starts a headless session in the copy and saves what it said as the re
   const [cwd, ...args] = readFileSync(join(root, 'claude.args'), 'utf8').trimEnd().split('\n');
   assert.equal(realpathSync(cwd), realpathSync(copy));
   assert.equal(args[0], '-p');
-  assert.match(args[1], /^\/sw:plan-implement T-02/);
+  assert.match(args[1], /^\/sw-plan-implement T-02/);
   const flags = args.slice(2).join(' ');
   assert.ok(flags.includes('--output-format stream-json'), flags);
   assert.ok(flags.includes('--verbose'), flags);

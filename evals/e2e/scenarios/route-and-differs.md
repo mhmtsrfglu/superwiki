@@ -1,6 +1,6 @@
 # The route said, then a differs item put to the user
 
-The user's session runs `sw:plan-implement` on T-02. The task file shows one area, two items, nothing open and one file named, so the rubric says small, or medium if the session reads the file count otherwise; either way no plan and no planner. The session says its `Route:` line, marks the task started and dispatches the implementer, which finds that T-02's first item (`src/export.cjs` with `module.exports`) contradicts the fixture's `AGENTS.md` rule, builds `src/export.mjs` instead and reports the item `differs`. `sw:implement` step 6 makes that the user's call: the session shows the difference and asks. A headless session gets no answer, so the task stays `in-progress`, with nothing accepted on the user's behalf. A session that routes large, plans, accepts the difference itself, or closes the task fails.
+The user's session runs `sw-plan-implement` on T-02. The task file shows one area, two items, nothing open and one file named, so the rubric says small, or medium if the session reads the file count otherwise; either way no plan and no planner. The session says its `Route:` line, marks the task started and dispatches the implementer, which finds that T-02's first item (`src/export.cjs` with `module.exports`) contradicts the fixture's `AGENTS.md` rule, builds `src/export.mjs` instead and reports the item `differs`. `sw-implement` step 6 makes that the user's call: the session shows the difference and asks. A headless session gets no answer, so the task stays `in-progress`, with nothing accepted on the user's behalf. A session that routes large, plans, accepts the difference itself, or closes the task fails.
 
 Task: T-02
 Skill: plan-implement
@@ -16,12 +16,12 @@ Budget: 8
 
 One run; the result is `check`'s verdict with the model and the cost `run` printed.
 
-The skill stops at `sw:implement` step 6, the `differs` item put to the user. The pass rows measure the route (said, and not large), the item (named `differs` in the session's own words), and the stop: the task in progress without a plan, and no `Changed ..., accepted by the user` note, which only the user's yes may add.
+The skill stops at `sw-implement` step 6, the `differs` item put to the user. The pass rows measure the route (said, and not large), the item (named `differs` in the session's own words), and the stop: the task in progress without a plan, and no `Changed ..., accepted by the user` note, which only the user's yes may add.
 
 ## Prompt
 
 ```text
-/sw:plan-implement T-02
+/sw-plan-implement T-02
 ```
 
 ## Pass

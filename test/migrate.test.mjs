@@ -5,8 +5,8 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-const migrate = new URL('../skills/migrate/scripts/migrate.mjs', import.meta.url).pathname;
-const init = new URL('../skills/init/scripts/init.mjs', import.meta.url).pathname;
+const migrate = new URL('../skills/sw-migrate/scripts/migrate.mjs', import.meta.url).pathname;
+const init = new URL('../skills/sw-init/scripts/init.mjs', import.meta.url).pathname;
 
 const INDEX = `# Work index
 

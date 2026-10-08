@@ -1,6 +1,6 @@
 # An unattended run over two tasks, stopped on a difference
 
-The user's session runs `sw:autopilot` over T-02 and T-03 with questions ruled out, so the run settles its standing answers from the defaults: plans approved without the user, no checks that need the environment, no commit, no push, stop when a task stops. It marks T-02 started, says its `Route:` line and implements it; the implementer reports the first item `differs` (CommonJS against the fixture's `AGENTS.md` rule), the run sends it back once in the task's wording, the implementer keeps what it built, and the task closes `unverified`, which stops the run before T-03. Every answer given in the user's place is recorded in the task's "Notes" and in the report, with the usage table at the end. A session that asks a question, accepts the difference itself, commits, or goes on to T-03 after the stop fails.
+The user's session runs `sw-autopilot` over T-02 and T-03 with questions ruled out, so the run settles its standing answers from the defaults: plans approved without the user, no checks that need the environment, no commit, no push, stop when a task stops. It marks T-02 started, says its `Route:` line and implements it; the implementer reports the first item `differs` (CommonJS against the fixture's `AGENTS.md` rule), the run sends it back once in the task's wording, the implementer keeps what it built, and the task closes `unverified`, which stops the run before T-03. Every answer given in the user's place is recorded in the task's "Notes" and in the report, with the usage table at the end. A session that asks a question, accepts the difference itself, commits, or goes on to T-03 after the stop fails.
 
 Task: T-02
 Skill: autopilot
@@ -21,7 +21,7 @@ This is the one headless scenario that runs to the skill's own end: the stop on 
 ## Prompt
 
 ```text
-/sw:autopilot T-02, then T-03. Ask me nothing: where this message does not answer a question, the default stands.
+/sw-autopilot T-02, then T-03. Ask me nothing: where this message does not answer a question, the default stands.
 ```
 
 ## Pass

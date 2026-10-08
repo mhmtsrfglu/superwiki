@@ -6,7 +6,7 @@ import { request } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-const init = new URL('../skills/init/scripts/init.mjs', import.meta.url).pathname;
+const init = new URL('../skills/sw-init/scripts/init.mjs', import.meta.url).pathname;
 const sw = (root, ...args) => spawnSync('node', [join(root, 'docs/.sw/sw.mjs'), ...args], { encoding: 'utf8', cwd: root });
 const read = (root, path) => readFileSync(join(root, path), 'utf8');
 
@@ -121,7 +121,7 @@ test('lint: exit code follows errors', () => {
   assert.match(lint.stdout, /E started-before-deps {2}docs\/tasks\/T-03\.md/);
 });
 
-// The skill is sw:index and the command is `index`; `board`, the name it had before, still works.
+// The skill is sw-index and the command is `index`; `board`, the name it had before, still works.
 test('index rewrites the task list, and board does the same under its old name', () => {
   const root = vault();
   writeFileSync(join(root, 'docs/index.md'), '# Index\n');
@@ -137,7 +137,7 @@ test('index rewrites the task list, and board does the same under its old name',
   assert.doesNotMatch(help, /^ {2}board /m, 'help lists the new name only');
 });
 
-// The skill is sw:usage and the command is `usage`; `stats` still works. A scratch vault has no
+// The skill is sw-usage and the command is `usage`; `stats` still works. A scratch vault has no
 // session record, so both answer with the same refusal.
 test('usage answers as stats does, under its own name', () => {
   const root = vault();

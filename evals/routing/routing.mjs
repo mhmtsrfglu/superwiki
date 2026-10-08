@@ -57,14 +57,9 @@ export function rulesBlock(agentsText) {
   return lines.slice(start + 1, end).join('\n').trim();
 }
 
-// [{ name, description }] from the frontmatter of every skills/*/SKILL.md, named as a Claude Code
-// plugin install shows them to the model: <plugin>:<name>, the plugin from .claude-plugin/plugin.json.
-// Sorted by name.
+// [{ name, description }] from the frontmatter of every skills/*/SKILL.md, named as every agent
+// shows them to the model: by the folder name, which the `name:` field repeats. Sorted by name.
 export function readSkills(root) {
-  const manifest = join(root, '.claude-plugin', 'plugin.json');
-  if (!existsSync(manifest)) throw new EvalError(`${manifest} is missing; the skills are named after the plugin in it`);
-  const plugin = JSON.parse(readFileSync(manifest, 'utf8')).name;
-  if (!plugin) throw new EvalError(`${manifest} has no name`);
   const dir = join(root, 'skills');
   const skills = [];
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -72,7 +67,8 @@ export function readSkills(root) {
     if (!entry.isDirectory() || !existsSync(file)) continue;
     const { data } = parseFrontmatter(readFileSync(file, 'utf8'));
     if (!data?.name || !data?.description) throw new EvalError(`${file} lacks a name or a description in its frontmatter`);
-    skills.push({ name: `${plugin}:${data.name}`, description: data.description });
+    if (data.name !== entry.name) throw new EvalError(`${file} is named ${data.name}, not ${entry.name}; an agent shows a skill by its folder name`);
+    skills.push({ name: entry.name, description: data.description });
   }
   return skills.sort((a, b) => a.name.localeCompare(b.name));
 }

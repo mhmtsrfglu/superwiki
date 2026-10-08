@@ -5,7 +5,7 @@ import { mkdirSync, mkdtempSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-const cli = new URL('../skills/init/assets/sw.mjs', import.meta.url).pathname;
+const cli = new URL('../skills/sw-init/assets/sw.mjs', import.meta.url).pathname;
 
 // A home folder for the tools' session records and a project that the sessions ran in.
 function setup() {

@@ -72,7 +72,7 @@ export function extractWikilinks(body) {
 }
 
 // ---------- Closing summary ----------
-// The `## Summary` section sw:verify writes into a task file when the task is closed. Its
+// The `## Summary` section sw-verify writes into a task file when the task is closed. Its
 // "Verification" list holds one numbered entry per "Done when" item: `1. **verified**: ...`.
 const VERDICT_ENTRY = /^(\d+)\.\s+\*\*(verified|failed|unverified)\*\*/;
 

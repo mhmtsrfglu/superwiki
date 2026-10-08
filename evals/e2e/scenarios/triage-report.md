@@ -1,6 +1,6 @@
 # A bug report, triaged without touching a file
 
-The user's session gets a bug report about the fixture: with the `planted-defect` overlay laid over the copy, `paginate(items(10), 5)` returns one page where two were expected. `sw:triage` searches the vault, looks at what changed, reads at most four files and reports under its headings; it offers a task and the top check, and acts on neither, since nobody answers. A session that reads the code first, reproduces the bug before searching, writes the fix, files a task on its own or records a cause the vault does not hold fails. The vault has no lesson page, so "Seen before" must say so plainly.
+The user's session gets a bug report about the fixture: with the `planted-defect` overlay laid over the copy, `paginate(items(10), 5)` returns one page where two were expected. `sw-triage` searches the vault, looks at what changed, reads at most four files and reports under its headings; it offers a task and the top check, and acts on neither, since nobody answers. A session that reads the code first, reproduces the bug before searching, writes the fix, files a task on its own or records a cause the vault does not hold fails. The vault has no lesson page, so "Seen before" must say so plainly.
 
 Task: T-01
 Skill: triage
@@ -21,7 +21,7 @@ The skill stops after its report, with its two offers open: a headless session g
 ## Prompt
 
 ```text
-/sw:triage `paginate(items(10), 5)` from src/paginate.mjs returns one page of five items; I expected two pages. It has been like this since T-01's change today.
+/sw-triage `paginate(items(10), 5)` from src/paginate.mjs returns one page of five items; I expected two pages. It has been like this since T-01's change today.
 ```
 
 ## Pass

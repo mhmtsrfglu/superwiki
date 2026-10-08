@@ -1,6 +1,6 @@
 # A plan drafted and presented, the task left as it was
 
-The user's session is asked to plan T-03, a task small by the rubric of `sw:plan` step 2: one area, two items, nothing open, one file named. The prompt wants a plan all the same, so the skill goes on: it has nothing to clarify, dispatches the planner, which writes `docs/plans/T-03-plan.md` as a draft, and presents the plan's Approach in its message. There it waits for the user's approval, which a headless session never gets. A session that approves the plan itself, marks an item `(test)` before approval, sets the task `in-progress`, or starts implementing fails.
+The user's session is asked to plan T-03, a task small by the rubric of `sw-plan` step 2: one area, two items, nothing open, one file named. The prompt wants a plan all the same, so the skill goes on: it has nothing to clarify, dispatches the planner, which writes `docs/plans/T-03-plan.md` as a draft, and presents the plan's Approach in its message. There it waits for the user's approval, which a headless session never gets. A session that approves the plan itself, marks an item `(test)` before approval, sets the task `in-progress`, or starts implementing fails.
 
 Task: T-03
 Skill: plan
@@ -21,7 +21,7 @@ The skill stops at step 5, the plan presented and the reply awaited. The pass ro
 ## Prompt
 
 ```text
-/sw:plan T-03. I want a plan for it although it is small: write the draft and present it to me.
+/sw-plan T-03. I want a plan for it although it is small: write the draft and present it to me.
 ```
 
 ## Pass

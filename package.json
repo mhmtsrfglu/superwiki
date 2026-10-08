@@ -29,8 +29,6 @@
   "files": [
     "bin",
     "skills",
-    ".claude-plugin",
-    ".codex-plugin",
     "install.sh"
   ],
   "engines": {

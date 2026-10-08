@@ -116,7 +116,7 @@ What it does not measure: the user's reply. A headless session cannot answer a q
    node skills/config/scripts/config.mjs sync --tools claude
    ```
 
-   It writes `.claude/agents/sw-reviewer.md` and `sw-implementer.md` from `skills/config/assets/`. They are git-ignored and go stale when a role file changes, so this step runs before every run; `prepare` refuses to run while the file for the scenario's role is missing. A `Skill:` scenario skips this step: the agents its session dispatches are written into the copy by `prepare`.
+   It writes `.claude/agents/sw-reviewer.md` and `sw-implementer.md` from the role files in `skills/implement/assets/` (and `sw-planner.md` from `skills/plan/assets/`). They are git-ignored and go stale when a role file changes, so this step runs before every run; `prepare` refuses to run while the file for the scenario's role is missing. A `Skill:` scenario skips this step: the agents its session dispatches are written into the copy by `prepare`.
 2. Prepare a clean copy per repetition, in a scratch directory outside the repository:
 
    ```sh

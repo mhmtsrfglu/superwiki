@@ -305,11 +305,47 @@ No tool lets a skill change the running session's model. Model choice therefore 
 | --- | --- |
 | Claude Code | `.claude/agents/sw-planner.md`, `sw-implementer.md`, `sw-reviewer.md` |
 | Codex | `.codex/agents/sw-planner.toml`, `sw-implementer.toml`, `sw-reviewer.toml` |
-| Copilot CLI | `.github/agents/sw-planner.agent.md`, `sw-implementer.agent.md`, `sw-reviewer.agent.md` |
+| Copilot CLI and VS Code Copilot Chat | `.github/agents/sw-planner.agent.md`, `sw-implementer.agent.md`, `sw-reviewer.agent.md`; both hosts read that folder |
 
-The Claude Code reviewer file also carries `tools: Read, Grep, Glob, Bash`: reading, searching and the shell, none of the editing tools. The Codex and Copilot CLI files carry no tools list, because their fields for one are not known from this repository; their reviewers are kept from editing by instruction only.
+The Claude Code reviewer file also carries `tools: Read, Grep, Glob, Bash`: reading, searching and the shell, none of the editing tools. The Codex and Copilot files carry no tools list: the Codex file format has no field for one, and the `tools` field of a Copilot agent file is not written because its values are not known for the shell; their reviewers are kept from editing by instruction only.
 
 The skills dispatch those agents by name. Where they are missing (a session that began before the files existed, a tool without subagents, a project whose rules forbid them), the skills follow the role's instructions in the main session and say that the configured model and the clean context were not used. A review done that way is weaker, and the skills say so.
+
+**Where the role files live.** `planner.md` is `skills/plan/assets/planner.md`; `implementer.md` and `reviewer.md` are `skills/implement/assets/`. Each sits in the skill that dispatches it, so a skill names its role file as `<skill-dir>/assets/<role>.md`, a path that resolves in the plugin, in an `sw-<name>` copy and through a link alike. Until T-27 they were in the sw:config skill's `assets/` folder and the skills named them by a path through `../config/`, which holds only where the folders carry bare names: in a copy the folder is `sw-config`, and the first Copilot run of this version (VS Code Copilot Chat, 2026-10-08) searched `~/.copilot/skills/config/` for the implementer's file, found nothing, and improvised the implementer's work in the main session. `config.mjs` reads the role files from its sibling skill folders, found the way `init.mjs` finds the skills it copies: by its own folder's name, bare siblings under `skills/` of a checkout or a plugin, `sw-` siblings in an agent's skills folder; a linked script runs at its real path, so it sees the checkout. No vault holds a role file, so a vault of an earlier version needs no migration: `sw:config sync` regenerates the agent files from the new places.
+
+#### Read from the vendors' documentation (2026-10-08)
+
+The hosts' rows in `sw:plan`, `sw:implement` and `sw:config` carry only facts from these tables. Each cell names the page it was read from; "not documented" means the pages listed were read on 2026-10-08 and do not give the fact. A fact the skills used before this date and the pages do not give (Copilot CLI's `task` tool, VS Code's `runSubagent`, a snake_case rule for Codex agent names) is not in the skills any more.
+
+Copilot CLI:
+
+| Fact | What the documentation says | Read from |
+| --- | --- | --- |
+| Agent folder | project: `.github/agents/`; user: `~/.copilot/agents/`; organization and enterprise: `/agents` in the `.github` or `.github-private` repository | [create-custom-agents-for-cli](https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/create-custom-agents-for-cli), [invoke-custom-agents](https://docs.github.com/en/copilot/how-tos/copilot-cli/use-copilot-cli/invoke-custom-agents) |
+| File format | Markdown with YAML frontmatter, extension `.agent.md` (the id is the file name without `.agent.md` or `.md`); `description` and the body (the prompt) are required, `name` and `tools` optional; `include-custom-instructions` is also shown | [about-custom-agents](https://docs.github.com/en/copilot/concepts/agents/copilot-cli/about-custom-agents), [create-custom-agents-for-cli](https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/create-custom-agents-for-cli) |
+| Subagent invocation | the user selects an agent with `/agent`, names it in the prompt ("Use the refactoring agent to ..."), or starts the CLI with `copilot --agent <name>`; "the AI model being used by the CLI can choose to delegate a task to a subsidiary subagent process, that operates using a custom agent". The name of the tool the model delegates with: not documented. A `task` tool: not documented (the reference lists a built-in "Task" agent that runs commands such as tests and builds, which is something else) | [invoke-custom-agents](https://docs.github.com/en/copilot/how-tos/copilot-cli/use-copilot-cli/invoke-custom-agents), [cli-command-reference](https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-command-reference) |
+| Skills folders | project: `.github/skills`, `.claude/skills`, `.agents/skills`; personal: `~/.copilot/skills`, `~/.agents/skills`; another location with `/skills add`. A skill is used as `/<name>` in the prompt | [add-skills](https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/add-skills) |
+| Plan mode | `Shift+Tab` or `/plan`; Copilot asks clarifying questions, "saves the plan to `plan.md` in your session folder" and "waits for your approval before implementing"; `Ctrl+y` opens the plan in the editor. Whether the shell is available in plan mode: not documented | [cli-best-practices](https://docs.github.com/en/copilot/how-tos/copilot-cli/cli-best-practices), [cli-command-reference](https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-command-reference) |
+
+VS Code Copilot Chat:
+
+| Fact | What the documentation says | Read from |
+| --- | --- | --- |
+| Agent folder | workspace: `.github/agents` (and `.claude/agents` in Claude's format); user: `~/.copilot/agents` or `~/.claude/agents` | [custom-agents](https://code.visualstudio.com/docs/agent-customization/custom-agents) |
+| File format | `.agent.md`, YAML frontmatter with `name` (optional, defaults to the file name), `description`, `tools`, `model`, `agents`, `handoffs`, `user-invocable`, `disable-model-invocation`, `target`; the Markdown body is the instructions | [custom-agents](https://code.visualstudio.com/docs/agent-customization/custom-agents) |
+| Subagent invocation | the user picks a custom agent in the Agent dropdown of the Chat view; an agent delegates with the `agent` tool to the agents its `agents` frontmatter lists (`*` for all, `[]` for none), and that tool must be in its `tools`; "each subagent works in its own context ... In the Local harness, subagents receive the delegated task and applicable instructions, not the main conversation history". Which custom agent a delegation from the main session runs when the session itself has no `agents` list, and a tool named `runSubagent`: not documented | [custom-agents](https://code.visualstudio.com/docs/agent-customization/custom-agents), [concepts/agents](https://code.visualstudio.com/docs/agents/concepts/agents) |
+| Skills folders | workspace: `.github/skills`, `.claude/skills`, `.agents/skills`; user: `~/.copilot/skills`, `~/.claude/skills`, `~/.agents/skills`; `chat.agentSkillsLocations` is deprecated. A skill is used by `/` in the chat or picked by description | [agent-skills](https://code.visualstudio.com/docs/agent-customization/agent-skills) |
+| Plan mode | `/plan` or Plan in the agent picker; "by default, this agent researches your project without editing project files"; in Local sessions "the plan is stored in session memory at `/memories/session/plan.md`, not as a project file"; after approval, "Implement Plan" or "Approve Plan Only" | [run/planning](https://code.visualstudio.com/docs/agents/run/planning) (the address `docs/copilot/agents/planning` redirects there) |
+
+Codex:
+
+| Fact | What the documentation says | Read from |
+| --- | --- | --- |
+| Agent folder | personal: `~/.codex/agents/`; project: `.codex/agents/`; a role can also be declared in `config.toml` under `[agents]` with `config_file` and `description` | [subagents](https://learn.chatgpt.com/docs/agent-configuration/subagents) (the address `developers.openai.com/codex/subagents` redirects there), [config-reference](https://learn.chatgpt.com/docs/config-file/config-reference) |
+| File format | TOML; `name`, `description` and `developer_instructions` required; `model`, `model_reasoning_effort`, `sandbox_mode`, `mcp_servers`, `skills.config` optional; the `name` field is authoritative, a matching file name is recommended. A rule on the form of the name (snake_case): not documented | [subagents](https://learn.chatgpt.com/docs/agent-configuration/subagents) |
+| Subagent invocation | the user instructs it ("spawn two agents", "use one agent per point"); the model's tools are `spawn_agent`, `send_input`, `resume_agent`, `wait_agent`, `close_agent`, under `features.multi_agent` and `agents.enabled`, both on by default. Whether `spawn_agent` takes a custom agent's name: not documented | [subagents](https://learn.chatgpt.com/docs/agent-configuration/subagents), [config-reference](https://learn.chatgpt.com/docs/config-file/config-reference) |
+| Skills folders | `.agents/skills` of the working directory, of each parent up to the repository root, and of the repository root; `$HOME/.agents/skills`; `/etc/codex/skills`. A skill is used as `$<name>` or picked by description | [build-skills](https://learn.chatgpt.com/docs/build-skills) (the address `developers.openai.com/codex/build-skills` redirects there) |
+| Plan mode | not documented on these pages | [config-reference](https://learn.chatgpt.com/docs/config-file/config-reference) |
 
 ## Viewer and CLI
 

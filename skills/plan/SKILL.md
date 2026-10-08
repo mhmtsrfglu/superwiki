@@ -7,7 +7,9 @@ description: Use when the user wants to plan a task or a piece of work in a Supe
 
 Produces `docs/plans/<ID>-plan.md` for one task. You clarify with the user and get approval; a planner subagent, running the model set in sw:config, reads the code and writes the plan file. You never read the code and never hold the plan text: that is what keeps planning cheap.
 
-Needs the task module (`docs/tasks/`). If it is missing, say so and offer sw:init with `--tasks`. Run commands from the project root. `<skill-dir>` is the directory this SKILL.md is in.
+Needs the task module (`docs/tasks/`). If it is missing, say so and offer sw:init with `--tasks`. Run commands from the project root. `<skill-dir>` is the directory this SKILL.md is in; the planner's role file, `planner.md`, is `<skill-dir>/assets/planner.md`.
+
+The plan is a file under `docs/plans/`, and a task is a file under `docs/tasks/`. When the host's plan mode, a memory tool or a rule of the host keeps this session from writing under `docs/` or from running the shell (a plan mode that holds its plan in the host's own memory or session folder is such a case), stop before the first write: name the obstacle to the user, ask them to lift it (leave plan mode, allow the writes, give the session a shell), and wait. A plan kept anywhere but `docs/plans/<ID>-plan.md` is not the plan: do not present it as one and do not record an approval of it.
 
 ## Steps
 
@@ -28,11 +30,14 @@ Needs the task module (`docs/tasks/`). If it is missing, say so and offer sw:ini
 
    A second round goes to the planner that wrote the draft where the tool can continue it (a further message to that agent), otherwise to a fresh one.
 
+   The agent is the one sw:config wrote for the host, named `sw-planner` (`sw_planner` in Codex), carrying `planner.md` and the model set under `models.plan`. Where the host's documentation does not say how a session runs a named custom agent, the row says so: ask for the agent by name, and if nothing runs it, take the last row.
+
    | Tool | How |
    | --- | --- |
-   | Claude Code | agent `sw-planner`. If it is not among your agent types, use a general-purpose agent, tell it to read `<skill-dir>/../config/assets/planner.md` first and follow it, and pass the model from `models.plan.claude` in `docs/.sw/config.json` if set |
-   | Codex | spawn the custom agent `sw_planner` |
-   | Copilot CLI | `task` tool with agent `sw-planner` |
+   | Claude Code | agent `sw-planner`. If it is not among your agent types, use a general-purpose agent, tell it to read `planner.md` first and follow it, and pass the model from `models.plan.claude` in `docs/.sw/config.json` if set |
+   | Codex | the custom agent `sw_planner`, from `.codex/agents/sw-planner.toml`. Codex spawns agents with its multi-agent tools (`spawn_agent` and the rest, on by default); whether a spawn can name a custom agent is not documented, so ask for `sw_planner` by name in the spawn, and if the spawned agent is not it, the last row |
+   | Copilot CLI | the custom agent `sw-planner`, from `.github/agents/sw-planner.agent.md`. The CLI delegates to a subagent that runs a custom agent when the model chooses to; the tool it delegates with is not documented, so ask for the `sw-planner` agent by name in the prompt, and if no subagent runs it, the last row |
+   | VS Code Copilot Chat | the same file, `.github/agents/sw-planner.agent.md`. An agent delegates with the `agent` tool to the agents its `agents` list names; how a plain chat session names one is not documented, so ask for the `sw-planner` agent by name, and if the delegation does not run it, the last row |
    | No subagents available, or the agent is not defined | follow `planner.md` yourself, in this session, and tell the user the configured model was not used |
 
 5. **Present the plan and get approval.** Show the user, in a normal message, the planner's `Approach`, its `Questions` (each with the assumed answer as your recommendation), its `Split`, and the path of the plan file so they can read it. Plan mode is not used: a reply can need files written before the plan is shown again. Read the plan file into your own context only if the user asks you about its content.
@@ -70,6 +75,7 @@ The planner's `Split:` names, per new task, its title, its dependencies and the 
 - Planning a small task. The plan costs more than the work.
 - Exploring the codebase before dispatching, or reading the plan back. You pay for it twice.
 - Editing the plan yourself. If something in it is wrong, send it back to the planner.
+- Presenting a plan the host's plan mode wrote into its own memory or session folder as the plan. The plan is the file in `docs/plans/`; without it there is nothing to approve.
 - Setting the task to `in-progress`. Planning does not change status; only sw:autopilot marks a task started before planning it.
 - Creating the tasks of a proposed split before the user agrees to it.
 - Approving a revised plan the user has not been shown.

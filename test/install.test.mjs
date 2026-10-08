@@ -224,3 +224,34 @@ test('a foreign skill of the same name in a project is kept and reported', () =>
   assert.equal(read(join(p, '.agents/skills/sw-init/SKILL.md')), 'mine');
   assert.ok(existsSync(join(p, '.agents/skills/sw-plan/.sw-installed')));
 });
+
+// sw:plan and sw:implement name the role files as `<skill-dir>/assets/<role>.md`. That form has to
+// resolve in every layout a session can load the skills from: the plugin (the checkout's bare
+// folders), a copy (`sw-<name>` folders) and a link (an `sw-<name>` entry that reaches the checkout).
+test('the role files sw:plan and sw:implement name resolve in the plugin, a copy and a link', () => {
+  const copied = home();
+  assert.equal(cli({ home: copied }, 'install', 'copilot').status, 0);
+  const linked = home();
+  assert.equal(sh({ home: linked }, 'copilot').status, 0);
+  const layouts = {
+    plugin: name => join(repo, 'skills', name),
+    copy: name => join(copied, '.copilot/skills', `sw-${name}`),
+    link: name => join(linked, '.copilot/skills', `sw-${name}`),
+  };
+  const expected = { plan: ['planner.md'], implement: ['implementer.md', 'reviewer.md'] };
+
+  for (const [layout, dir] of Object.entries(layouts)) {
+    for (const [skill, files] of Object.entries(expected)) {
+      const text = read(join(dir(skill), 'SKILL.md'));
+      const named = [...new Set([...text.matchAll(/<skill-dir>\/assets\/([a-z]+\.md)/g)].map(m => m[1]))].sort();
+      assert.deepEqual(named, files, `${layout}: sw:${skill} names exactly its role files`);
+      for (const file of files) {
+        const path = join(dir(skill), 'assets', file);
+        assert.ok(existsSync(path), `${layout}: ${path} resolves`);
+      }
+    }
+  }
+  for (const name of names) {
+    assert.doesNotMatch(read(join(repo, 'skills', name, 'SKILL.md')), /\.\.\/config\//, `sw:${name} names no ../config/ path`);
+  }
+});

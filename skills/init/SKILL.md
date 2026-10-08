@@ -41,7 +41,7 @@ The vault is always `<project root>/docs`. Run every command below from the proj
    | `note` "skills in the repository left alone" | that the script ran from the repository's own copy of the skills and so did not update them; give the command from the note |
    | "docs/ already had content" | that content is untouched and outside the vault; sw:migrate converts it |
 
-   End with how to look at the result: open `docs/` as an Obsidian vault, or open `docs/viewer.html` in Chrome or Edge and pick the project folder (only if the viewer was not reported `missing`).
+   End with how to look at the result: open `docs/` as an Obsidian vault, or open `docs/viewer.html` in Chrome or Edge and pick the project folder (only if the viewer was not reported `missing`). When the answers name Codex or Copilot (the skills question answered yes, or the user said they work with one of them), add that Codex and Copilot run the planner, implementer and reviewer only through agent files in the project, which sw:config writes: `sw:config sync --tools codex`, `copilot` or both, once, before the first sw:plan or sw:implement there.
 
 ## What the script guarantees
 

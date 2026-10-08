@@ -83,3 +83,18 @@ test('usage errors exit with 2 and say why', () => {
   assert.equal(noVault.status, 2);
   assert.match(noVault.stderr, /run sw:init first/);
 });
+
+// An `sw-<name>` copy holds the role files beside the skills that dispatch them, as the checkout
+// does; config.mjs finds them from its own folder, in a copy as in the checkout.
+test('config.mjs writes the agent files from an sw-<name> copy of the skills', () => {
+  const bin = new URL('../bin/superwiki.mjs', import.meta.url).pathname;
+  const home = mkdtempSync(join(tmpdir(), 'sw-home-'));
+  execFileSync('node', [bin, 'install', 'copilot'], { env: { ...process.env, HOME: home } });
+  const copy = join(home, '.copilot/skills/sw-config/scripts/config.mjs');
+  const root = project();
+  const out = execFileSync('node', [copy, 'model', 'plan', 'claude', 'opus', '--root', root], { encoding: 'utf8' });
+  assert.match(out, /created {3}\.claude\/agents\/sw-planner\.md\ncreated {3}\.claude\/agents\/sw-implementer\.md\ncreated {3}\.claude\/agents\/sw-reviewer\.md/);
+  assert.match(read(root, '.claude/agents/sw-planner.md'), /# Planner/);
+  assert.match(read(root, '.claude/agents/sw-implementer.md'), /# Implementer/);
+  assert.match(read(root, '.claude/agents/sw-reviewer.md'), /# Reviewer/);
+});

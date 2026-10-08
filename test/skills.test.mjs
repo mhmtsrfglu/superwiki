@@ -29,8 +29,10 @@ test('the small-task rule reads the same in sw:plan-implement, sw:plan, sw:imple
 // Every role derives the requirement ids D<n> and N<n> from position; the three role files define
 // them in one sentence, the same in each.
 test('the planner, implementer and reviewer define requirement ids in the same words', () => {
+  // Each role file lives in the skill that dispatches it.
+  const roleFiles = { planner: 'plan/assets/planner.md', implementer: 'implement/assets/implementer.md', reviewer: 'implement/assets/reviewer.md' };
   const definitions = ['planner', 'implementer', 'reviewer'].map(role => {
-    const text = readFileSync(new URL(`config/assets/${role}.md`, skillsDir), 'utf8');
+    const text = readFileSync(new URL(roleFiles[role], skillsDir), 'utf8');
     const found = text.match(/Requirements have ids, [^\n]*?bears on none of them asks for nothing\./g) || [];
     assert.equal(found.length, 1, `${role}.md defines the ids once`);
     return found[0];

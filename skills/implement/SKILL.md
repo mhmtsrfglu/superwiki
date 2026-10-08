@@ -30,7 +30,7 @@ Run commands from the project root. `<skill-dir>` is the directory this SKILL.md
 
    A task is small when its task file alone shows all four: one area, meaning its work belongs to the configured area its id prefix names and to no other (`areas` in `docs/.sw/config.json`; with one configured area, every task is in one area); three "Done when" items or fewer, as the `done when:` line of `node docs/.sw/sw.mjs check <ID>` counts them; nothing left open in its "Notes"; and the files that change, named in the task file, three or fewer. A task whose file does not show how many files change is medium at least, never small.
 
-3. **Mark it started** before any work:
+3. **Mark it started** before any work. The status lives in the task file, under `docs/`. When the host's plan mode, a memory tool or a rule of the host keeps this session from writing under `docs/` or from running the shell, stop here, before the status changes: name the obstacle to the user, ask them to lift it (leave plan mode, allow the writes, give the session a shell), and wait; do not do the task's work in the meantime. Then:
    - in the frontmatter of `docs/tasks/<ID>.md`, `status: in-progress` and `started:` today;
    - in `docs/log.md`, a new entry `## [date] task | <ID> started`, in the layout its last entries use;
    - `node docs/.sw/sw.mjs index`, so the task list in `index.md` shows it.
@@ -93,19 +93,21 @@ What each dispatch gets:
 
 `Checks:` is the list of step 4, one line per check, `- <check>: allowed` or `- <check>: not allowed`; leave the block out while the list is empty. Every prompt names the project root if it is not your working directory.
 
-How to dispatch is the same for both roles: `sw-implementer` with `implementer.md` and the model key `models.implement`, `sw-reviewer` with `reviewer.md` and the model key `models.review`. The key is the role's verb, not the agent's name.
+How to dispatch is the same for both roles: `sw-implementer` with `implementer.md` and the model key `models.implement`, `sw-reviewer` with `reviewer.md` and the model key `models.review`. The key is the role's verb, not the agent's name. The role files are `<skill-dir>/assets/implementer.md` and `<skill-dir>/assets/reviewer.md`. The agent is the one sw:config wrote for the host, carrying the role file and the model set under its key; in Codex its name is `sw_implementer` or `sw_reviewer`. Where the host's documentation does not say how a session runs a named custom agent, the row says so: ask for the agent by name, and if nothing runs it, take the last row.
 
 | Tool | How |
 | --- | --- |
-| Claude Code | the agent by name. If it is not among your agent types, use a general-purpose agent, tell it to read `<skill-dir>/../config/assets/<role file>` first and follow it, and pass the model from `docs/.sw/config.json` if set: `models.implement.claude` for the implementer, `models.review.claude` for the reviewer |
-| Codex | spawn the custom agent `sw_implementer` or `sw_reviewer` |
-| Copilot CLI | `task` tool with the agent name |
+| Claude Code | the agent by name. If it is not among your agent types, use a general-purpose agent, tell it to read the role file first and follow it, and pass the model from `docs/.sw/config.json` if set: `models.implement.claude` for the implementer, `models.review.claude` for the reviewer |
+| Codex | the custom agent `sw_implementer` or `sw_reviewer`, from `.codex/agents/`. Codex spawns agents with its multi-agent tools (`spawn_agent` and the rest, on by default); whether a spawn can name a custom agent is not documented, so ask for the agent by name in the spawn, and if the spawned agent is not it, the last row |
+| Copilot CLI | the custom agent `sw-implementer` or `sw-reviewer`, from `.github/agents/`. The CLI delegates to a subagent that runs a custom agent when the model chooses to; the tool it delegates with is not documented, so ask for the agent by name in the prompt, and if no subagent runs it, the last row |
+| VS Code Copilot Chat | the same files in `.github/agents/`. An agent delegates with the `agent` tool to the agents its `agents` list names; how a plain chat session names one is not documented, so ask for the agent by name, and if the delegation does not run it, the last row |
 | No subagents available, the agent is not defined, or the project's rules forbid subagents | follow the role file yourself, in this session, and tell the user the configured model and the clean context were not used. A review done this way is weaker: say so |
 
 ## Common mistakes
 
 - Marking `done`, or writing `verified`, from the implementer's report. The report is a claim; the check is the summary's commands, run in this session.
 - Passing an item marked "(test)" on a green test alone. Without the `red:` line the test has not been seen to fail, and the summary marks the item `unverified`.
+- Doing the task's work while the host keeps the session from writing under `docs/`. The status change comes first; a host that blocks it is told to the user, not worked around.
 - Accepting a `differs` or `preferred` item on the user's behalf. A sensible alternative is still not what the task asked for.
 - Leaving the question about checks that need the environment unasked because the plan's approval was waived. Only a standing answer in the first message replaces it.
 - Giving a later review only the files the fix touched. A finding in an untouched file is then never rechecked.

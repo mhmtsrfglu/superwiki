@@ -49,3 +49,9 @@ Not sent to the agent. Read each report at these places: a finding there means t
 | F19 | when the stop for a check that was not allowed fires: before the implementer, or after the summary | T-05 |
 | F20 | how an item built but not verified is reported, and whether the review starts | T-03 |
 | F21 | what counts as a decision made without the user in the run's report | T-05 |
+| F22 | which standing answers the run says when the message answers only commit, and whether it asks for the rest | T-32 |
+| F23 | what the run reads before the first task, which points it lists then, and whether B-22's dev-server item is one of them | T-32 |
+| F24 | what B-21's item built differently gets: a fix round in the task's wording, or the task closed with the question for the user, and what decides between the two | T-32 |
+| F25 | whether B-22's dev-server check runs under the default, and what a check that changes data would get | T-32 |
+| F26 | whether B-20 and B-21, without `review:`, get a reviewer | T-32 |
+| F27 | where a decision the run made is written, and with what source | T-32 |

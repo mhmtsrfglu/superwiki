@@ -200,6 +200,7 @@ test('the shipped scenarios parse and say what they need', () => {
   assert.equal(scenarios['route-and-differs'].task, 'T-02');
   assert.ok(scenarios['route-and-differs'].pass.some(row => row.kind === 'output' && /Route/.test(row.re.source)));
   assert.equal(scenarios['autopilot-run'].task, 'T-02');
+  assert.deepEqual(scenarios['autopilot-run'].overlays, ['judgment']);
   assert.ok(scenarios['autopilot-run'].budget >= scenarios['route-and-differs'].budget);
   assert.ok(scenarios['autopilot-run'].pass.some(row => row.kind === 'file' && row.path === 'docs/tasks/T-02.md'));
 });

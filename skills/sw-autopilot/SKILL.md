@@ -32,7 +32,11 @@ This skill takes the place of their other steps.
    | Commit after each task? Push? | no commit, no push |
    | Go on with other tasks when one stops? | no; stop the run |
 
-   A question is answered only where the message speaks to it: "finish them all" sets the scope and "don't ask me" rules out questions, and neither answers one; "don't commit" answers commit, not push. Ask for the open ones in one question. When the message rules out questions, ask nothing: write one line that starts `Standing answers:` and gives all four, the user's where given and the default otherwise, and start.
+   A question is answered only where the message speaks to it: "finish them all" sets the scope and "don't ask me" rules out questions, and neither answers one; "don't commit" answers commit, not push. Ask for the open ones in one question. When the message rules out questions, ask nothing: write one line that starts `Standing answers:` and gives all four, the user's where given and the default otherwise, and start. That line is a message to the user, written as given, word for word, in this shape, with each default kept where the message gave no answer:
+
+   `Standing answers: plans and splits approved without the user: yes; checks that need the environment: none; commit: no; push: no; when a task stops: stop the run.`
+
+   It is the first line of the message in which you report what step 3 found (lint, the tree), on its own line, before any task is touched. Settling the answers in your reasoning, reporting them in other words, or listing the defaults only in the report does not replace it, since a reader of the session finds the answers by those words; the report repeats the line, as "The report" says.
 3. **Check that the run can do what was agreed**, before any task is touched:
    - `node docs/.sw/sw.mjs lint`: errors are fixed or reported first.
    - Commits were agreed: run one harmless git command. Refused by the project's settings or the tool: say so now, and neither start the run nor work around the refusal.
@@ -43,7 +47,7 @@ This skill takes the place of their other steps.
 1. **Next task**: `node docs/.sw/sw.mjs ready`. A task in scope that is in progress comes first, then the first ready one in scope. None left: go to "The report".
 2. **Gate**: sw-implement step 2, with sw-plan-implement's `check` table. A task whose plan is approved goes to step 5; one already in progress skips step 3.
 3. **Mark it started** (sw-implement step 3), before routing.
-4. **Route it** with sw-plan-implement's rubric, from the task file alone, and say sw-plan-implement step 3's `Route:` line; a standing answer is no waiver by the user. A draft plan means large.
+4. **Route it** with sw-plan-implement's rubric, from the task file alone, and say sw-plan-implement step 3's `Route:` line, written as given there, word for word, on its own line in your output; the route in the report's table does not replace it. A standing answer is no waiver by the user. A draft plan means large.
    - Small: step 5.
    - Medium: the `Approach (sw-plan-implement, <date>):` note into "Notes", as sw-plan-implement writes it, unless one is there; then step 5.
    - Large: sw-plan steps 4 to 6; step 6 runs whole, so the plan is `approved`.
@@ -69,7 +73,7 @@ This skill takes the place of their other steps.
 Every answer you give in the user's place, recorded where it was made:
 
 - on a task (a planner question answered, a plan or split approved under the standing answer, a `differs` or `preferred` item sent back): in its "Notes" as `- <date>, decided without the user: ...`, and in the report with its id;
-- for the run (each default in the `Standing answers:` line, working-tree changes left alone): in the report under `run` only. A check a default disallows adds no line.
+- for the run (each default in the `Standing answers:` line, working-tree changes left alone): in the report under `run` only, below the `Standing answers:` line repeated as it was said. A check a default disallows adds no line.
 
 ## When to stop
 
@@ -94,7 +98,7 @@ A stop on a task fires once the task is closed (step 6), with its summary and ou
 At the end or on a stop:
 
 1. A table, one row per task in scope (`not reached` for the rest): task, route, outcome, the last review verdict with the number of reviews, commit; `-` where none.
-2. **Decisions made without the user**, one line each with the task id, or `run`.
+2. **Decisions made without the user**: first the `Standing answers:` line repeated as it was said, on its own line and not as a list item, then one line each with the task id, or `run`. The heading is written as given, word for word, `Decisions made without the user`: not reworded to address the user or shortened, since a reader of the report finds the decisions by those words.
 3. What stopped the run, and what would let it continue: for a difference, the user's call on it, applied as sw-implement step 6 says; for a check not allowed, the user's yes; for a failed review, its blocking findings.
 4. Offers, open decisions, and every review's `important` and `minor` findings.
 5. `node docs/.sw/sw.mjs usage`, as printed.

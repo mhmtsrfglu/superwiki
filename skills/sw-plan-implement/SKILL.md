@@ -39,7 +39,7 @@ Needs the task module (`docs/tasks/`). If it is missing, say so and offer sw-ini
    | small | all four conditions of the rule above: one area, three "Done when" items or fewer, nothing left open, three files or fewer named | sw-implement directly; no plan, no note |
    | medium | everything else: one area, nothing open, and four to six "Done when" items or more than three files or the files not shown | an "Approach" note in "Notes", then sw-implement |
 
-3. **Say the route** in one line before acting: `Route: <class> (<the rubric conditions that decided it>).` Do not wait for an answer. When the user has waived the plan's approval, the line says so: `Route: <class>, plan approval waived by the user (<the rubric conditions that decided it>).`
+3. **Say the route** in one line before acting: `Route: <class> (<the rubric conditions that decided it>).` The line is written as given, word for word: it begins `Route:` at the start of its own line, and a sentence that gives the route in other words does not replace it, since a reader of the session finds the route by those words. Do not wait for an answer. When the user has waived the plan's approval, the line says so: `Route: <class>, plan approval waived by the user (<the rubric conditions that decided it>).`
 
    **Override.** A route the user names wins over the rubric, whether in the invocation ("as small", "with a plan", "no plan") or at any later point. When the override lowers the class, record it in the task's "Notes" as `- Route: <class>, chosen by the user.` Only a named route lowers the class. A waiver of approval ("without presenting the plan for approval", "no need to approve it") names no route: the class stays what the rubric decided.
 4. **Follow the route.**
@@ -54,6 +54,7 @@ Needs the task module (`docs/tasks/`). If it is missing, say so and offer sw-ini
 - Reading code or a plan file to classify. The rubric uses the task file only.
 - Counting files or areas from the code. A task file that does not name the files that change makes the task medium at least; an area is a configured one, never a part of the code.
 - Asking the user to confirm the route. Say it and go on; the user interrupts if they disagree.
+- Giving the route in other words. The `Route:` line is written as step 3 gives it; a table or a sentence that names the route is not the line.
 - Skipping the planner, or lowering the route, because the user waived the plan's approval. A waiver removes the stop, not the plan; only a named route lowers the class.
 - Treating the Approach note as a plan. `check` still says `plan: none`, and the note holds no steps or verification list.
 - Writing a long Approach note, or exploring the code to write it. Past five lines the task is large: use the large route.

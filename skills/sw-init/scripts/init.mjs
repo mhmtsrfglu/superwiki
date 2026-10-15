@@ -125,6 +125,7 @@ function buildConfig(previous, { root, tasks, areas, skills }) {
     models,
     skills: skills ?? previous?.skills ?? [],
     ...(previous?.tools ? { tools: previous.tools } : {}),
+    ...(previous?.autopilot ? { autopilot: previous.autopilot } : {}),
   };
 }
 

@@ -14,6 +14,7 @@ node <skill-dir>/scripts/config.mjs model implement claude sonnet
 node <skill-dir>/scripts/config.mjs model review codex gpt-6
 node <skill-dir>/scripts/config.mjs model plan copilot --unset
 node <skill-dir>/scripts/config.mjs areas "M=Mobile,B=Backend"
+node <skill-dir>/scripts/config.mjs peak 400k
 node <skill-dir>/scripts/config.mjs sync --tools claude,codex,copilot
 ```
 
@@ -54,3 +55,7 @@ Do not edit the generated agent files or `config.json` by hand; the next `sync` 
 ## Areas
 
 `areas` adds prefixes or renames them. It never removes one: tasks keep their ids forever.
+
+## Autopilot peak
+
+`peak` sets `autopilot.peak`: the size of the orchestrating session, in tokens, above which `sw-autopilot` stops between tasks (its `main` row in `node docs/.sw/sw.mjs usage`). Unset, the limit is 200000. One small task grows that session by about 120k tokens, so a session that starts at 60k reaches the default after one task; a project that wants a run to take several tasks raises the limit, as far as the model's context window allows with room to spare: the host summarizes a session that fills its window, and that loses the reports the run decides from. `peak --unset` goes back to the default; `show` prints the current value.

@@ -85,7 +85,7 @@ A line the run writes into "Notes" while the task runs (`decided without the use
 6. **Close the task**, also one that stops the run:
    - `node docs/.sw/sw.mjs lint`. An error stops the run.
    - Commit, if agreed and the task is `done`: the files under its Summary's `### Changes` plus its bookkeeping (task file, plan, `docs/log.md`, `docs/index.md`, the area guide if changed), message `<ID>: <title>`. Push only if agreed. A refused commit or push stops the run.
-7. **Check your own size**: `node docs/.sw/sw.mjs usage`, row `main`. A `peak` above 200k tokens stops the run here, between tasks.
+7. **Check your own size**: `node docs/.sw/sw.mjs usage`, row `main`. A `peak` above the limit stops the run here, between tasks. The limit is `autopilot.peak` in `docs/.sw/config.json`, in tokens, set with sw-config's `peak` command; 200000 when the key is absent.
 
 ### What differs in a run
 
@@ -117,7 +117,7 @@ A stop on a task fires once the task is closed (step 6), with its summary and ou
 - The summary leaves an item `failed` or `unverified`, also one whose check was not allowed: that stop too fires after the summary, never before the work, with the task built, reviewed where the review started, and summarized.
 - `lint` reports an error, or an agreed commit or push is refused.
 - A large task, when the user's message says plans are not approved by the run: stop before its planner.
-- Your `peak` is above 200k.
+- Your `peak` is above the limit of "Each task" step 7 (`autopilot.peak`, 200000 when unset).
 
 ## Keeping the run cheap
 

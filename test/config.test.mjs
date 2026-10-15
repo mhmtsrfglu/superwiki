@@ -56,6 +56,7 @@ test('unset, areas and show; sw-init keeps models and tools on re-run', () => {
   assert.doesNotMatch(read(root, '.claude/agents/sw-planner.md'), /^model:/m);
   assert.match(read(root, '.claude/agents/sw-reviewer.md'), /\ntools: Read, Grep, Glob, Bash\nmodel: opus\n---/, 'tools come before model in the frontmatter');
   run(root, 'areas', 'B=Backend');
+  run(root, 'peak', '400k');
   execFileSync('node', [init, '--root', root]);
 
   const show = run(root, 'show');
@@ -63,6 +64,19 @@ test('unset, areas and show; sw-init keeps models and tools on re-run', () => {
   assert.match(show, /plan: claude=default/);
   assert.match(show, /review: claude=opus/);
   assert.match(show, /agent files for: claude/);
+  assert.match(show, /autopilot peak: 400000/, 'sw-init keeps the autopilot limit on re-run');
+});
+
+test('the autopilot peak is set in tokens, unset back to the default, and refused when it is not a number', () => {
+  const root = project();
+  assert.match(run(root, 'show'), /autopilot peak: default \(200000\)/);
+  assert.match(run(root, 'peak', '350000'), /autopilot peak: 350000/);
+  assert.equal(JSON.parse(read(root, 'docs/.sw/config.json')).autopilot.peak, 350000);
+  assert.match(run(root, 'peak', '--unset'), /autopilot peak: default \(200000\)/);
+  assert.equal(JSON.parse(read(root, 'docs/.sw/config.json')).autopilot, undefined);
+  const bad = spawnSync('node', [config, 'peak', 'lots', '--root', root], { encoding: 'utf8' });
+  assert.equal(bad.status, 2);
+  assert.match(bad.stderr, /usage: config\.mjs peak <tokens/);
 });
 
 test('a config written before the review role existed still works', () => {

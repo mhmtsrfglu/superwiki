@@ -210,7 +210,7 @@ Commands are shown as typed in Claude Code and Copilot CLI. In Codex write `$sw-
 | --- | --- |
 | `/sw-init` | set up `docs/` in the current project, or upgrade it |
 | `/sw-migrate` | convert task tables the project already has, on a git branch of its own |
-| `/sw-config plan with opus, implement with sonnet` | choose the model for planning, implementing and reviewing; add task areas |
+| `/sw-config plan with opus, implement with sonnet` | choose the model for planning, implementing and reviewing; add task areas; set the session size at which `sw-autopilot` stops between tasks |
 
 ### Work on tasks
 

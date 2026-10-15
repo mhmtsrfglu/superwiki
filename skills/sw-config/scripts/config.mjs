@@ -75,12 +75,17 @@ function markdownAgent(role, body, model, tools) {
 const TOOL_NAMES = Object.keys(TOOLS);
 const ROLE_NAMES = Object.keys(ROLES);
 
+const DEFAULT_PEAK = 200000;
+const PEAK = /^(\d+)(k?)$/i;
+
 const HELP = `config.mjs <command> [--root <dir>]
 
   show                                   print the configuration
   model <${ROLE_NAMES.join('|')}> <tool> <model>  set the model a tool uses for a role (tool: ${TOOL_NAMES.join(', ')})
   model <${ROLE_NAMES.join('|')}> <tool> --unset  go back to the tool's default model
   areas "M=Mobile,B=Backend"             add or rename task areas (existing areas are never removed)
+  peak <tokens>                          the size of the orchestrating session at which sw-autopilot stops between tasks (default ${DEFAULT_PEAK})
+  peak --unset                           go back to the default
   sync [--tools claude,codex]            (re)write agent files for the given tools, or for every configured tool`;
 
 class UsageError extends Error {}
@@ -144,6 +149,24 @@ const COMMANDS = {
       console.log(`${role}: ${TOOL_NAMES.map(tool => `${tool}=${config.models[role][tool] || 'default'}`).join('  ')}`);
     }
     console.log(`agent files for: ${config.tools.join(', ') || 'none'}`);
+    console.log(`autopilot peak: ${config.autopilot?.peak ?? `default (${DEFAULT_PEAK})`}`);
+  },
+
+  // The orchestrating session's `peak` (sw.mjs usage, row main) above which sw-autopilot stops
+  // between tasks. One small task grows that session by about 120k tokens, so the limit decides
+  // how many tasks a run takes before a fresh session continues it; it stays below the point at
+  // which the host summarizes the session, since the run's evidence is in its own context.
+  peak({ config, save, args }) {
+    const [value] = args;
+    if (value === '--unset') {
+      delete config.autopilot;
+    } else {
+      const match = PEAK.exec(value ?? '');
+      if (!match) throw new UsageError('usage: config.mjs peak <tokens, such as 400000 or 400k|--unset>');
+      config.autopilot = { ...config.autopilot, peak: Number(match[1]) * (match[2] ? 1000 : 1) };
+    }
+    save();
+    console.log(`autopilot peak: ${config.autopilot?.peak ?? `default (${DEFAULT_PEAK})`}`);
   },
 
   model({ root, config, save, args }) {

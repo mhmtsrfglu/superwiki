@@ -5,8 +5,6 @@ status: draft
 updated: YYYY-MM-DD
 ---
 
-# Plan: T-01
-
 ## Approach
 
 The chosen approach and the assumptions it rests on, in a few lines.

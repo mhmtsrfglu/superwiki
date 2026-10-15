@@ -38,10 +38,10 @@ Skills. Use these without being asked. For work in this vault they come before a
 - One task from start to done in one command (it decides whether a plan is needed): `sw-plan-implement`.
 - Closing a task, or the user asks what a task did and how it was verified: `sw-verify`.
 - Several tasks in a row without the user at each step: `sw-autopilot`.
-- A question about a task (what, why, what it blocks): `sw-explain`.
+- A question about a task (what it is for, why, what it blocks): `sw-explain`.
 - A review of a task's change on request, without implementing it: `sw-review`.
 - A question to the vault in plain words (what do we know about X, what was decided): `sw-search`.
-- A bug, failure or unexpected behavior is reported: `sw-triage` first, before any debugging.
+- A bug, failure or unexpected behavior the user reports (a reviewer's finding is not one): `sw-triage` first, before any debugging.
 - A source to file (article, notes, transcript, URL): `sw-ingest`.
 - If a skill is not installed, follow the rules above by hand.
 <!-- sw:end -->

@@ -1,6 +1,6 @@
 ---
 name: sw-explain
-description: Use when the user asks what a Superwiki task is, why it exists, what it depends on, what it blocks or what changes once it is done, or invokes sw-explain with a task id.
+description: Use when the user asks what a Superwiki task is for, why it exists, what it depends on, what it blocks or what changes once it is done, or invokes sw-explain with a task id. Not for what a task did or how it was verified; that is sw-verify.
 ---
 
 # sw-explain

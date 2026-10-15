@@ -4,7 +4,7 @@
 //            overlays over it and prints the agent type to dispatch or the skill to run, and the prompt
 //   run      starts a headless `claude -p` session in the copy for a Skill: scenario and saves what
 //            the session said as the report
-//   check    runs the scenario's pass table against the copy and the saved report
+//   check    runs the scenario's pass table against the copy, the saved report and the session's events
 // prepare and check never call a model; run calls one through the claude CLI. evals/README.md says
 // how a Role: scenario's agent is dispatched by hand between prepare and check.
 import { spawnSync } from 'node:child_process';
@@ -32,7 +32,7 @@ const TREE_FILE = '.git/e2e-tree';
 // A headless session may write the copy's local settings; the tree hash must not see them.
 const EXCLUDED = '.claude/settings.local.json';
 const HEADER = /^(Task|Role|Skill|Budget|Overlays|Files): (.*)$/;
-const CHECK_KINDS = 'sw, output, file or tree';
+const CHECK_KINDS = 'sw, output, events, file or tree';
 // The session runs unattended in the scratch copy, says everything as stream-json events, and
 // stops at the scenario's budget. The skills come from ~/.claude/skills; project settings are the copy's.
 const CLAUDE_ARGS = ['--output-format', 'stream-json', '--verbose', '--dangerously-skip-permissions', '--permission-prompts', 'none', '--setting-sources', 'user,project'];
@@ -81,7 +81,7 @@ function parseCheck(check, expect, fail) {
     const exit = expect.match(/^exit (\d+)$/);
     return { ...row, args, exit: exit ? Number(exit[1]) : null, line: exit ? null : expect };
   }
-  if (kind === 'output') {
+  if (kind === 'output' || kind === 'events') {
     if (args.length) fail(`"${check}" takes no arguments`);
     return { ...row, ...parseMatch(kind, expect, fail) };
   }
@@ -250,12 +250,27 @@ function preparedCopy(dir) {
   return { copy, cli, tree: readFileSync(treePath, 'utf8').trim() };
 }
 
-// The stream-json events of a session → what it said and what it cost. The report is every text
-// block of the main session, in order; subagents' blocks carry a parent_tool_use_id and are left out.
+// One transcript line for a block of the main session: `text: <the text, line breaks as " / ">` or
+// `tool: <name> <the file, the command's first line, the agent type or the skill>`; null for the rest.
+function describe(block) {
+  if (block.type === 'text') {
+    const lines = (block.text ?? '').split('\n').map(line => line.trim()).filter(Boolean);
+    return lines.length ? `text: ${lines.join(' / ')}` : null;
+  }
+  if (block.type !== 'tool_use') return null;
+  const input = block.input ?? {};
+  const what = input.file_path ?? input.command?.split('\n')[0] ?? input.subagent_type ?? input.skill ?? '';
+  return `tool: ${block.name} ${what}`.trimEnd();
+}
+
+// The stream-json events of a session → what it said and did, and what it cost. The report is every
+// text block of the main session, in order; the transcript is one line per block of the main session,
+// text or tool call, in order. Subagents' blocks carry a parent_tool_use_id and are left out of both.
 function readSession(text) {
-  const session = { model: null, turns: null, cost: null, subtype: null, id: null, ok: false, report: '' };
+  const session = { model: null, turns: null, cost: null, subtype: null, id: null, ok: false, report: '', transcript: '' };
   const seen = new Set();
   const texts = [];
+  const lines = [];
   for (const line of text.split('\n')) {
     if (!line.trim()) continue;
     let event;
@@ -269,11 +284,13 @@ function readSession(text) {
       session.id ??= event.session_id ?? null;
     } else if (event.type === 'assistant' && !event.parent_tool_use_id) {
       for (const block of event.message?.content ?? []) {
-        if (block.type !== 'text' || !block.text?.trim()) continue;
-        const key = `${event.message.id}\n${block.text}`;
+        const described = describe(block);
+        if (!described) continue;
+        const key = `${event.message.id}\n${block.id ?? described}`;
         if (seen.has(key)) continue;
         seen.add(key);
-        texts.push(block.text.trim());
+        lines.push(described);
+        if (block.type === 'text') texts.push(block.text.trim());
       }
     } else if (event.type === 'result') {
       session.subtype = event.subtype ?? null;
@@ -285,6 +302,7 @@ function readSession(text) {
     }
   }
   session.report = texts.length ? `${texts.join('\n\n')}\n` : '';
+  session.transcript = lines.length ? `${lines.join('\n')}\n` : '';
   return session;
 }
 
@@ -324,7 +342,7 @@ function search(text, row, where) {
   return { ok, detail: ok ? '' : found ? `found "${found[0]}"` : `no match ${where}` };
 }
 
-function runCheck(row, { copy, cli, output, tree }) {
+function runCheck(row, { copy, cli, output, events, eventsPath, tree }) {
   if (row.kind === 'sw') {
     const result = spawnSync(process.execPath, [cli, ...row.args], { cwd: copy, encoding: 'utf8' });
     if (row.exit !== null) return { ok: result.status === row.exit, detail: `exit ${result.status}` };
@@ -332,6 +350,10 @@ function runCheck(row, { copy, cli, output, tree }) {
     return { ok, detail: ok ? '' : `exit ${result.status}; output: ${tail(result.stdout || result.stderr) || 'none'}` };
   }
   if (row.kind === 'output') return search(output, row, 'in the output');
+  if (row.kind === 'events') {
+    if (events === null) return { ok: false, detail: `missing: ${eventsPath}` };
+    return search(events, row, 'in the events');
+  }
   if (row.kind === 'file') {
     const path = join(copy, row.path);
     if (!existsSync(path)) return row.mode === 'lacks' ? { ok: true, detail: '' } : { ok: false, detail: `missing: ${row.path}` };
@@ -341,10 +363,13 @@ function runCheck(row, { copy, cli, output, tree }) {
   return { ok: !changed, detail: changed ? `changed: ${changed.split('\n').join(', ')}` : '' };
 }
 
-// Every pass row of the scenario, run against the prepared copy and the saved report.
+// Every pass row of the scenario, run against the prepared copy, the saved report and the session's
+// events beside it (`<report>.jsonl`, which `run` writes; an `events` row fails without them).
 export function check(ref, dir, outputPath) {
   const scenario = loadScenario(ref);
-  const context = { ...preparedCopy(dir), output: readInput(outputPath) };
+  const eventsPath = `${resolve(outputPath)}.jsonl`;
+  const events = existsSync(eventsPath) ? readSession(readInput(eventsPath)).transcript : null;
+  const context = { ...preparedCopy(dir), output: readInput(outputPath), events, eventsPath };
   const rows = scenario.pass.map(row => ({ check: row.check, expect: row.expect, ...runCheck(row, context) }));
   return { ok: rows.every(row => row.ok), rows };
 }
@@ -369,7 +394,8 @@ run      starts "claude -p" in the prepared copy of a Skill: scenario, unattende
          Budget: as --max-budget-usd unless given here, and saves the session's events as <file>.jsonl
          and what the main session said as <file>; prints the model, turns, cost, result and session id
          exit 0 the session ended in success, 1 otherwise (the report is still written), 2 an input error
-check    runs the scenario's pass table against the copy and the report saved in <report>
+check    runs the scenario's pass table against the copy, the report saved in <report> and the
+         session's events in <report>.jsonl (an events row fails when that file is missing)
          exit 0 every row passes, 1 a row fails, 2 an input error
 <scenario> is a name in evals/e2e/scenarios/ or a path to a scenario file`;
 

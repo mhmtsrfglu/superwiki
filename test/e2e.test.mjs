@@ -7,8 +7,8 @@ import { join } from 'node:path';
 import { EvalError, check, main, parseScenario, prepare } from '../evals/e2e/e2e.mjs';
 
 const E2E = new URL('../evals/e2e/', import.meta.url).pathname;
-const SCENARIOS = ['autopilot-run', 'differs-item', 'plan-draft', 'planted-defect', 'route-and-differs', 'second-review', 'service-check', 'triage-report'];
-const SKILLS = { 'triage-report': 'triage', 'plan-draft': 'plan', 'route-and-differs': 'plan-implement', 'autopilot-run': 'autopilot' };
+const SCENARIOS = ['autopilot-resume', 'autopilot-run', 'autopilot-stop', 'differs-item', 'plan-draft', 'planted-defect', 'route-and-differs', 'second-review', 'service-check', 'triage-report'];
+const SKILLS = { 'triage-report': 'triage', 'plan-draft': 'plan', 'route-and-differs': 'plan-implement', 'autopilot-run': 'autopilot', 'autopilot-stop': 'autopilot', 'autopilot-resume': 'autopilot' };
 
 const sw = (root, ...args) => spawnSync('node', [join(root, 'docs/.sw/sw.mjs'), ...args], { encoding: 'utf8', cwd: root });
 const git = (root, ...args) => spawnSync('git', args, { encoding: 'utf8', cwd: root }).stdout;
@@ -144,6 +144,8 @@ test('parseScenario rejects a bad check kind, a bad expectation and a missing he
   const withRow = row => SCENARIO.replace('| `tree` | `unchanged` |', row);
   assert.throws(() => parseScenario(withRow('| `grep foo` | `exit 0` |'), 'crafted'), { name: 'Error', message: /crafted: unknown check kind "grep"/ });
   assert.throws(() => parseScenario(withRow('| `output` | `contains Verdict` |'), 'crafted'), /output expects "matches/);
+  assert.throws(() => parseScenario(withRow('| `events main` | `matches /x/` |'), 'crafted'), /"events main" takes no arguments/);
+  assert.throws(() => parseScenario(withRow('| `events` | `has x` |'), 'crafted'), /events expects "matches/);
   assert.throws(() => parseScenario(withRow('| `tree` | `same` |'), 'crafted'), /tree expects "unchanged"/);
   assert.throws(() => parseScenario(withRow('| `file` | `matches /x/` |'), 'crafted'), /file needs a path/);
   assert.throws(() => parseScenario(withRow('| `file docs/a.md` | `contains x` |'), 'crafted'), /file expects "matches/);
@@ -203,6 +205,61 @@ test('the shipped scenarios parse and say what they need', () => {
   assert.deepEqual(scenarios['autopilot-run'].overlays, ['judgment']);
   assert.ok(scenarios['autopilot-run'].budget >= scenarios['route-and-differs'].budget);
   assert.ok(scenarios['autopilot-run'].pass.some(row => row.kind === 'file' && row.path === 'docs/tasks/T-02.md'));
+
+  // The resume pair: the stop writes the run file before any agent runs, the resume reads it with its
+  // first tool call and reports the recorded standing answers; both read the events' order, not the
+  // report alone.
+  assert.equal(scenarios['autopilot-stop'].task, 'T-02');
+  assert.deepEqual(scenarios['autopilot-stop'].overlays, ['judgment']);
+  assert.ok(scenarios['autopilot-stop'].pass.some(row => row.kind === 'events' && /run\\\.md/.test(row.re.source)));
+  assert.ok(scenarios['autopilot-stop'].pass.some(row => row.kind === 'file' && row.path === 'docs/.sw/run.md'));
+  assert.equal(scenarios['autopilot-resume'].task, 'T-03');
+  assert.match(scenarios['autopilot-resume'].prompt, /continue the run/);
+  assert.ok(scenarios['autopilot-resume'].pass.some(row => row.kind === 'events' && /run\\\.md/.test(row.re.source)));
+  assert.ok(scenarios['autopilot-resume'].pass.some(row => row.kind === 'output' && /^\^Standing answers: /.test(row.re.source)));
+  assert.ok(scenarios['autopilot-resume'].pass.some(row => row.kind === 'file' && row.path === 'docs/tasks/T-03.md'));
+});
+
+test('an events row searches the main session\'s transcript in order, and fails without the events file', () => {
+  const { root, copy } = scratch();
+  prepare('route-and-differs', copy);
+  const report = join(root, 'report.txt');
+  writeFileSync(report, 'Standing answers: the defaults.\nNothing left to ask: the run starts.\n');
+  const scenario = join(root, 'events.md');
+  writeFileSync(scenario, [
+    'Task: T-02', 'Skill: autopilot', 'Budget: 1', '', '## Run', '', 'x', '', '## Prompt', '', '```text', '/sw-autopilot T-02', '```', '', '## Pass', '',
+    '| check | expect |', '| --- | --- |',
+    '| `events` | `matches /^(?:(?!tool: Edit)[^\\n]*\\n)*text: [^\\n]*Standing/` |',
+    '| `events` | `matches /^text: Standing answers: the defaults\\. \\/ Nothing left to ask: the run starts\\.\\ntool: Edit docs\\/tasks\\/T-02\\.md\\ntool: Bash node docs\\/\\.sw\\/sw\\.mjs ready\\ntool: Agent sw-implementer\\n$/` |',
+    '| `events` | `lacks /subagent/` |',
+    '',
+  ].join('\n'));
+  assert.deepEqual(parseScenario(readFileSync(scenario, 'utf8'), 'events').pass.map(row => row.kind), ['events', 'events', 'events']);
+
+  // No `<report>.jsonl`: every events row fails, `lacks` included.
+  const missing = check(scenario, copy, report);
+  assert.deepEqual(missing.rows.map(row => row.ok), [false, false, false]);
+  assert.equal(missing.rows[0].detail, `missing: ${report}.jsonl`);
+
+  const text = said('m1', 'Standing answers: the defaults.\n\nNothing left to ask: the run starts.');
+  const tool = (id, name, input) => ({ type: 'assistant', message: { id, content: [{ type: 'tool_use', id: `t-${id}`, name, input }] }, parent_tool_use_id: null, session_id: 's-1' });
+  const edit = tool('m2', 'Edit', { file_path: 'docs/tasks/T-02.md', old_string: 'status: todo', new_string: 'status: in-progress' });
+  const bash = tool('m3', 'Bash', { command: 'node docs/.sw/sw.mjs ready\nnode docs/.sw/sw.mjs check T-02', description: 'Next task' });
+  const agent = tool('m4', 'Agent', { subagent_type: 'sw-implementer', prompt: 'T-02' });
+  const inSubagent = said('m5', 'Text in the subagent.', 't-m4');
+  const events = list => writeFileSync(`${report}.jsonl`, `${list.map(event => JSON.stringify(event)).join('\n')}\n`);
+
+  // One line per text block and tool call of the main session, in order; the subagent's text is left out.
+  events([EVENTS[0], text, edit, bash, agent, inSubagent, RESULT]);
+  const ordered = check(scenario, copy, report);
+  assert.deepEqual(ordered.rows.map(row => row.ok), [true, true, true], JSON.stringify(ordered.rows));
+
+  // The same blocks with the edit before the text: the order row fails and names the transcript.
+  events([EVENTS[0], edit, text, bash, agent, inSubagent, RESULT]);
+  const reversed = check(scenario, copy, report);
+  assert.deepEqual(reversed.rows.map(row => row.ok), [false, false, true]);
+  assert.equal(reversed.rows[0].detail, 'no match in the events');
+  assert.match(cli('check', scenario, copy, report).out, /^FAIL {2}events \| matches .* {2}\(no match in the events\)$/m);
 });
 
 test('prepare makes a clean copy with a vault, one commit and the overlay uncommitted', () => {

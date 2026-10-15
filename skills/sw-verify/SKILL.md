@@ -23,7 +23,7 @@ Run commands from the project root.
    - work already committed: `git log --name-status --format='%h %s' --grep='^<ID>:'`, the commits whose message starts with `<ID>:`;
    - the short HEAD for the source line: `git rev-parse --short HEAD`.
 
-   List the files that belong to this task, without its bookkeeping (the task file, its plan, `docs/log.md`, `docs/index.md`, the area guide). Uncommitted work can sit next to other tasks' changes, so a file belongs to the task when it is both in `git status --porcelain` and in the "files changed" of this task's implementer reports, the first report and each fix round's. A session that ran several tasks holds other tasks' reports too; they do not count. Invoked by hand with no report in this session: the whole list, when the tree holds nothing else; otherwise ask the user which files belong to the task. No git repository, or the vault is ignored by git: say so in the section instead of listing files from recollection.
+   List the files that belong to this task, without its bookkeeping (the task file, its plan, `docs/log.md`, `docs/index.md`, the area guide, a run's `docs/.sw/run.md`). Uncommitted work can sit next to other tasks' changes, so a file belongs to the task when it is both in `git status --porcelain` and in the "files changed" of this task's implementer reports, the first report and each fix round's. A session that ran several tasks holds other tasks' reports too; they do not count. Invoked by hand with no report in this session: the whole list, when the tree holds nothing else; otherwise ask the user which files belong to the task. No git repository, or the vault is ignored by git: say so in the section instead of listing files from recollection.
 3. **Pick one command per "Done when" item.**
 
    | Where the command comes from | When |
@@ -56,7 +56,7 @@ Run commands from the project root.
 
    Run the project check with no filter by test name, class, file or module: a filtered run leaves out what the item's tests do not reach, and can delete generated files. A project check that needs the environment and was not allowed is not run, and the guard line says so. Then read `git status --porcelain` again and compare it with the list of step 2:
    - a file shown as deleted that this task did not delete is unexpected: the item whose files or command touched it is `failed`, and its result names the file;
-   - a modified or untracked file that step 2 did not account for goes under Changes. Accounted for are the files on its list, any task's bookkeeping, and another task's files, by that task's implementer report or the user's word;
+   - a modified or untracked file that step 2 did not account for goes under Changes. Accounted for are the files on its list, any task's bookkeeping, and another task's files, by that task's implementer report, its Summary's `### Changes` or the user's word;
    - a non-zero exit, or a failing test, makes the item it concerns `failed`.
 
 5. **Write the section** in the format below. It is the last section of the file. If the file already has a `## Summary`, replace it whole; every verdict in the new one comes from this session. Leave the frontmatter and the other sections as they are.

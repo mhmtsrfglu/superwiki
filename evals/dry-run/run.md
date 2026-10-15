@@ -1,6 +1,6 @@
 # Dry-run: run brief
 
-Source: the run brief in appendix B of [the audit source](../../docs/raw/2026-10-05-prompt-quality-audit.md), made at commit `23c12e3`. Three changes from the audit: the user's message is in English, where the audit gave it in Turkish; the scenario states that its project's `areas` names the prefix `B` Backend, with the tasks `B-20` to `B-22` in place of the audit's `T-20` to `T-22`, since this repository's `areas` names only `T`, Tasks; and the skills carry the names they have had since T-14: `sw-<name>`, with the audit's `run` now `sw-autopilot`, its `do` now `sw-plan-implement` and its `summarize` now `sw-verify`.
+Source: the run brief in appendix B of [the audit source](../../docs/raw/2026-10-05-prompt-quality-audit.md), made at commit `23c12e3`. Four changes from the audit: the user's message is in English, where the audit gave it in Turkish; the scenario states that its project's `areas` names the prefix `B` Backend, with the tasks `B-20` to `B-22` in place of the audit's `T-20` to `T-22`, since this repository's `areas` names only `T`, Tasks; the skills carry the names they have had since T-14: `sw-<name>`, with the audit's `run` now `sw-autopilot`, its `do` now `sw-plan-implement` and its `summarize` now `sw-verify`; and, since T-24, the session's size stops the run after B-20 and a fresh session is told to continue it, so the brief also walks a run across two sessions.
 
 The brief follows an unattended `sw-autopilot` over three tasks, as the orchestrating session. Give the prompt below to a fresh agent in the root of this repository, copied whole, and nothing else.
 
@@ -17,7 +17,7 @@ Scenario. The scenario's project differs from this repository in one setting: `a
 - B-20: two "Done when" items, one area, nothing open in its notes.
 - B-21: five "Done when" items, one area, nothing open in its notes. Its implementer reports four items met and one built differently from the task's wording.
 - B-22: four "Done when" items, `review: required`. One of its items can only be checked by starting the dev server. The reviewer's first verdict is `changes needed`.
-The working tree is clean at the start, and git works.
+The working tree is clean at the start, and git works. After B-20 is closed, `node docs/.sw/sw.mjs usage` shows the session's `peak` above the run's limit. The user then opens a fresh session and types "sw-autopilot: continue the run." and nothing else; walk that session too, from its first message to the end of the run, as the same orchestrating session would in a fresh context.
 
 For each place you get stuck, report one finding with:
 - kind: `guess` (the text does not say; you must choose), `conflict` (two texts say different things) or `uncovered` (the scenario reaches a case no text handles);
@@ -55,3 +55,4 @@ Not sent to the agent. Read each report at these places: a finding there means t
 | F25 | whether B-22's dev-server check runs under the default, and what a check that changes data would get | T-32 |
 | F26 | whether B-20 and B-21, without `review:`, get a reviewer | T-32 |
 | F27 | where a decision the run made is written, and with what source | T-32 |
+| F28 | what the first session writes down for a later one and when, what the continuing session reads, which lines it says before its first task, and what it asks | T-24 |

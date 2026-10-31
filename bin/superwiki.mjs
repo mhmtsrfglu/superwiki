@@ -204,7 +204,9 @@ for (const target of targets) {
 {
   const scope = project || homedir();
   const hosts = [...new Set(targets)].filter(target => target !== 'global');
-  const lines = command === 'install' ? registerHooks(scope, hosts, { home: !project }) : removeHooks(scope, hosts, { home: !project });
+  // At home the hook runs the bundle this install put under the skills folder, never a repository's own file.
+  const options = { home: !project, bundle: host => join(destFor(host), 'sw-init/assets/sw.mjs') };
+  const lines = command === 'install' ? registerHooks(scope, hosts, options) : removeHooks(scope, hosts, options);
   if (lines.length) console.log(`hooks: ${scope}`);
   for (const [state, label] of lines) console.log(`  ${state.padEnd(8)} ${label}`);
 }

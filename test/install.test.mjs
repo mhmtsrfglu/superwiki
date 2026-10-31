@@ -382,6 +382,22 @@ test('a home-folder install registers the claude and codex hooks under ~ and say
   assert.equal(ourEntries(json(files.codex).hooks.PreToolUse).length, 1);
   assert.ok(!existsSync(files.copilot));
   assert.match(r.stdout, /copilot.*hook.*project/i);
+  // At home the command runs the installed bundle by absolute path on the vault in the cwd, never a
+  // repository's own docs/.sw/sw.mjs.
+  const claudeCommand = json(files.claude).hooks.PreToolUse[0].hooks[0].command;
+  assert.equal(claudeCommand, `test -d docs/.sw && node '${h}/.claude/skills/sw-init/assets'/sw.mjs hook claude --docs docs || true`);
+  assert.equal(json(files.codex).hooks.PreToolUse[0].hooks[0].command, `test -d docs/.sw && node '${h}/.agents/skills/sw-init/assets'/sw.mjs hook codex --docs docs || true`);
+  const call = cwd => JSON.stringify({ cwd, hook_event_name: 'PreToolUse', tool_name: 'Write', tool_input: { file_path: 'test/a.test.mjs', content: "test('a');\ntest('b');\ntest('c');\n" } });
+  const bare = project();
+  const skipped = spawnSync('sh', ['-c', claudeCommand], { cwd: bare, encoding: 'utf8', input: call(bare), env: { ...process.env, ...noClaude, HOME: h } });
+  assert.equal(skipped.status, 0);
+  assert.equal(skipped.stdout, '', 'no vault: nothing said');
+  const vault = project();
+  execFileSync(process.execPath, [join(repo, 'skills/sw-init/scripts/init.mjs'), '--root', vault, '--tasks'], { encoding: 'utf8' });
+  writeFileSync(join(vault, 'docs/tasks/T-01.md'), '---\ntype: task\nid: T-01\ntitle: A\nstatus: in-progress\ndeps: []\nsoft_deps: []\n---\n\n## Goal\n\nA.\n\n## Done when\n\n- a (test)\n');
+  const denied = spawnSync('sh', ['-c', claudeCommand], { cwd: vault, encoding: 'utf8', input: call(vault), env: { ...process.env, ...noClaude, HOME: h } });
+  assert.equal(denied.status, 0);
+  assert.match(denied.stdout, /"permissionDecision":"deny"/, 'the installed bundle reads the vault in the cwd');
   assert.equal(cli({ home: h }, 'uninstall', 'all').status, 0);
   assert.equal(ourEntries(json(files.claude).hooks?.PreToolUse).length, 0);
   assert.ok(!existsSync(files.codex));

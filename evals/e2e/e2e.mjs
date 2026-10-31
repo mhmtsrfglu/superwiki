@@ -263,9 +263,19 @@ function describe(block) {
   return `tool: ${block.name} ${what}`.trimEnd();
 }
 
+const HOOK_ERROR = /^(?:Error: )?(PreToolUse:\S+ hook error: [^\n]*)/;
+
+// The hook's message when a tool_result block carries a refusal, as `PreToolUse:<tool> hook error: ...`.
+function hookRefusal(block) {
+  if (block?.type !== 'tool_result') return null;
+  const text = typeof block.content === 'string' ? block.content : (block.content ?? []).map(part => part.text ?? '').join('\n');
+  return HOOK_ERROR.exec(text)?.[1] ?? null;
+}
+
 // The stream-json events of a session → what it said and did, and what it cost. The report is every
 // text block of the main session, in order; the transcript is one line per block of the main session,
-// text or tool call, in order. Subagents' blocks carry a parent_tool_use_id and are left out of both.
+// text or tool call, in order, plus a `hook:` line for every tool call a hook refused, in the main
+// session or a subagent. Subagents' other blocks carry a parent_tool_use_id and are left out of both.
 function readSession(text) {
   const session = { model: null, turns: null, cost: null, subtype: null, id: null, ok: false, report: '', transcript: '' };
   const seen = new Set();
@@ -291,6 +301,13 @@ function readSession(text) {
         seen.add(key);
         lines.push(described);
         if (block.type === 'text') texts.push(block.text.trim());
+      }
+    } else if (event.type === 'user') {
+      // A tool call a hook refused, in the main session or a subagent: the hosts answer the call with the
+      // hook's message as an error result, so a scenario can ask that a write was refused.
+      for (const block of event.message?.content ?? []) {
+        const refused = hookRefusal(block);
+        if (refused) lines.push(`hook: ${refused}`);
       }
     } else if (event.type === 'result') {
       session.subtype = event.subtype ?? null;

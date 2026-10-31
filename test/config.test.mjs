@@ -31,8 +31,8 @@ test('setting a model writes all three role files, for that tool only', () => {
   assert.match(reviewer, /^tools: Read, Grep, Glob, Bash$/m, 'the reviewer gets reading, searching and shell tools only');
   assert.doesNotMatch(planner, /^tools:/m, 'the planner keeps the tool default');
   assert.doesNotMatch(implementer, /^tools:/m, 'the implementer keeps the tool default');
-  assert.ok(!existsSync(join(root, '.codex')));
-  assert.ok(!existsSync(join(root, '.github')));
+  assert.ok(!existsSync(join(root, '.codex/agents')), '.codex holds only the hook init registered');
+  assert.ok(!existsSync(join(root, '.github/agents')));
 });
 
 test('codex and copilot get their own formats', () => {

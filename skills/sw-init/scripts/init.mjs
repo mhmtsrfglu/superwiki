@@ -6,6 +6,7 @@ import { spawnSync } from 'node:child_process';
 import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { registerHooks } from './hooks.mjs';
 
 const SKILL_DIR = join(dirname(fileURLToPath(import.meta.url)), '..');
 const ASSETS = join(SKILL_DIR, 'assets');
@@ -20,6 +21,7 @@ const MANAGED_BLOCK = /<!-- sw:start[\s\S]*?<!-- sw:end -->/;
 // What a vault consists of at the top of docs/. Anything else there belongs to someone else.
 const VAULT_ENTRIES = ['index.md', 'log.md', 'raw', 'wiki', 'tasks', 'plans', 'viewer.html'];
 const ROLES = ['plan', 'implement', 'review'];
+const HOOK_HOSTS = ['claude', 'codex', 'copilot'];
 const NEW_INDEX = '# Index\n\n## Wiki\n\nCatalog of the wiki: one line per page, `- [[file-name]]: summary`, grouped by type.\n';
 
 const HELP = `init.mjs [--root <dir>] [--tasks | --no-tasks] [--areas "M=Mobile,B=Backend"]
@@ -292,6 +294,8 @@ function main(argv) {
   report.write(configPath, JSON.stringify(config, null, 2) + '\n');
   writeAgentRules(root, tasks, report);
   if (config.skills.length) writeSkills(root, config.skills, report);
+  // The test guard, in every host's own place: the files travel with the project.
+  for (const [state, label] of registerHooks(root, HOOK_HOSTS)) report.line(state, label);
 
   console.log(report.lines.join('\n'));
   const taskState = tasks ? `on (areas: ${Object.keys(config.areas).join(', ')})` : 'off';

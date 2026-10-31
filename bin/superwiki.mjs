@@ -12,6 +12,7 @@ import { dirname, join } from 'node:path';
 import { homedir } from 'node:os';
 import { createInterface } from 'node:readline/promises';
 import { fileURLToPath } from 'node:url';
+import { registerHooks, removeHooks } from '../skills/sw-init/scripts/hooks.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const skillsDir = join(root, 'skills');
@@ -196,6 +197,16 @@ for (const target of targets) {
     if (link) { symlinkSync(join(skillsDir, skill), path); console.log(`  linked   ${skill}`); }
     else { copySkill(join(skillsDir, skill), path); console.log(`  copied   ${skill}`); }
   }
+}
+
+// ---------- The test guard: a PreToolUse hook in each host's own place, at the same scope ----------
+// Codex and Copilot share a skills folder, so this is its own loop. `global` names no host.
+{
+  const scope = project || homedir();
+  const hosts = [...new Set(targets)].filter(target => target !== 'global');
+  const lines = command === 'install' ? registerHooks(scope, hosts, { home: !project }) : removeHooks(scope, hosts, { home: !project });
+  if (lines.length) console.log(`hooks: ${scope}`);
+  for (const [state, label] of lines) console.log(`  ${state.padEnd(8)} ${label}`);
 }
 
 if (command === 'install') {

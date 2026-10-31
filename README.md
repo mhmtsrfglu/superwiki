@@ -128,6 +128,8 @@ npx superwiki install --project . claude codex   # this project, no question
 
 A skill folder of the same name that Superwiki did not install is kept and reported; `--force` replaces it.
 
+The install also registers the test guard, a `PreToolUse` hook, at the same scope: in the home folder, `~/.claude/settings.json` and `~/.codex/hooks.json` run the installed copy, `<skills folder>/sw-init/assets/sw.mjs`, by absolute path on the vault in the current directory (a project without `docs/.sw` is skipped); in a project, `.claude/settings.json`, `.codex/hooks.json` and `.github/hooks/superwiki.json` run the project's own `docs/.sw/sw.mjs`. Copilot reads hooks from the repository only, so a home-folder install leaves its hook to `sw-init`.
+
 Skills kept in a project are markdown and scripts inside your repository, so the project's own linter and formatter may pick them up. If they report on `.claude/skills` or `.agents/skills`, add those folders to their ignore lists.
 
 ### Cloud agents

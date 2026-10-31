@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { boardFinding, indexWithBoard, taskBoard } from './board.js';
 import { VAULT_FOLDERS, buildVault, guideFor, lint, nextId, resolve, search, summary, taskOf, tasksIn, unblockedBy } from './core.js';
 import { formatStartContext, startContext } from './doctor.js';
+import { decide } from './guard.js';
 import { SESSION_TOOLS, findSession } from './sessions.js';
 import { formatStats, sessionStats } from './stats.js';
 
@@ -27,7 +28,9 @@ const HELP = `sw <command> [--docs <dir>] [--json]
   doctor          what that session carried before it read anything: rule files, skill and tool lists
                   both take ${SESSION_FLAGS} to look at another session of this project
   serve [--open]  start (or reuse) a local viewer at http://127.0.0.1:<port>/ that reads the files live
-  snapshot        write docs/.sw/data.js so docs/viewer.html opens as a file, frozen at this moment`;
+  snapshot        write docs/.sw/data.js so docs/viewer.html opens as a file, frozen at this moment
+  hook <host>     the PreToolUse hook of claude, codex or copilot: reads the tool call from stdin and, while
+                  a task is in progress, denies a write that adds a test case beyond the task's allowance`;
 
 const SELF = fileURLToPath(import.meta.url);
 const ROOT_FILES = ['index.md', 'log.md'];
@@ -406,8 +409,25 @@ async function serve({ docs, flags }) {
 
 // ---------- Entry point ----------
 
+// `hook <claude|codex|copilot>`: the test guard, registered by sw-init as each host's PreToolUse hook.
+// The tool call comes on stdin; a deny is the host's JSON on stdout, an allow prints nothing. It
+// always exits 0 (a non-zero exit is a block on some hosts): bad input, no task in progress, no
+// vault or a call that edits no file all allow.
+function hookCommand(ctx) {
+  let input = null;
+  try {
+    input = JSON.parse(readFileSync(0, 'utf8'));
+  } catch {
+    input = null;
+  }
+  const verdict = decide(ctx.args[0], input, { docs: ctx.docs, root: dirname(ctx.docs) });
+  if (verdict.deny) console.log(JSON.stringify(verdict.output));
+  return null;
+}
+
 const COMMANDS = {
   status: { run: status, needsVault: true },
+  hook: { run: hookCommand, needsVault: false },
   ready: { run: ready, needsVault: true },
   check: { run: check, needsVault: true },
   explain: { run: explain, needsVault: true },
@@ -462,6 +482,7 @@ async function main(argv) {
   }
   const docs = docsDir(flags);
   if (!existsSync(docs)) {
+    if (command === 'hook') return 0; // no vault: the guard allows every call
     console.error(`no docs folder at ${docs}; run sw-init or pass --docs`);
     return 2;
   }

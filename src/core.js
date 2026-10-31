@@ -104,6 +104,15 @@ export function doneWhenItems(body) {
   return countDoneWhen(lines, levelTwoSections(lines));
 }
 
+// The "Done when" items that end in "(test)": the ones a test proves. The hook allows one test case
+// per marked item and one for the Goal while the task is in progress.
+export function markedDoneWhen(body) {
+  const lines = String(body ?? '').split(/\r?\n/);
+  const section = levelTwoSections(lines).find(s => s.title === 'done when');
+  if (!section) return 0;
+  return lines.slice(section.start + 1, section.end).filter(l => /^[-*+]\s+\S/.test(l) && /\(test\)\s*$/.test(l)).length;
+}
+
 // null when the body has no `## Summary`. Otherwise the verdict counts over the "Done when" items
 // (an item without an entry is unverified), `complete` when every item is verified, the section's
 // markdown without its heading (`text`) and the body without the section (`rest`).

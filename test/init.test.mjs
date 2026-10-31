@@ -137,7 +137,7 @@ test('--skills copies every skill as sw-<name> into the folder Codex and Copilot
     assert.ok(existsSync(join(folder, '.sw-installed')), `${name} marker`);
   }
   assert.ok(existsSync(join(root, '.agents/skills/sw-init/scripts/init.mjs')));
-  assert.ok(!existsSync(join(root, '.claude')));
+  assert.ok(!existsSync(join(root, '.claude/skills')), 'only the hook settings go under .claude');
   assert.deepEqual(JSON.parse(read(root, 'docs/.sw/config.json')).skills, ['codex', 'copilot']);
   assert.match(out, /created {3}\.agents\/skills\/sw-plan\//);
   assert.equal(out.match(/\.agents\/skills\/sw-plan\//g).length, 1, 'the shared folder is reported once');
@@ -170,7 +170,7 @@ test('without --skills, and with --no-skills, no skill folder is written', () =>
   for (const flags of [[], ['--no-skills']]) {
     const root = fresh();
     const out = run(root, '--tasks', ...flags);
-    assert.ok(!existsSync(join(root, '.claude')));
+    assert.ok(!existsSync(join(root, '.claude/skills')));
     assert.ok(!existsSync(join(root, '.agents')));
     assert.deepEqual(JSON.parse(read(root, 'docs/.sw/config.json')).skills, []);
     assert.match(out, /skills: not in the repository$/m);
@@ -241,4 +241,31 @@ test('run from a copy in another project, init.mjs copies only the sw- folders b
   execFileSync('node', [join(source, '.agents/skills/sw-init/scripts/init.mjs'), '--root', root, '--tasks', '--skills', 'codex'], { encoding: 'utf8' });
   assert.equal(read(root, '.agents/skills/sw-plan/SKILL.md'), copyOf('sw-plan'));
   assert.ok(!existsSync(join(root, '.agents/skills/other-skill')));
+});
+
+test('init registers the test guard hook for claude, codex and copilot in the project, one entry each, and keeps it on a re-run', () => {
+  const root = fresh();
+  run(root, '--tasks');
+  const ours = (entries = []) => entries.filter(entry => (entry.hooks ?? [entry]).some(hook => /sw\.mjs hook/.test(hook.command ?? hook.bash ?? '')));
+  const claude = JSON.parse(read(root, '.claude/settings.json'));
+  assert.equal(ours(claude.hooks.PreToolUse).length, 1);
+  assert.equal(claude.hooks.PreToolUse[0].matcher, 'Bash|Write|Edit|MultiEdit|NotebookEdit');
+  const codex = JSON.parse(read(root, '.codex/hooks.json'));
+  assert.equal(ours(codex.hooks.PreToolUse).length, 1);
+  assert.equal(codex.hooks.PreToolUse[0].matcher, 'Bash|apply_patch');
+  const copilot = JSON.parse(read(root, '.github/hooks/superwiki.json'));
+  assert.equal(copilot.version, 1);
+  assert.equal(ours(copilot.hooks.PreToolUse).length, 1);
+  const out = run(root);
+  assert.match(out, /unchanged \.claude\/settings\.json/);
+  assert.equal(ours(JSON.parse(read(root, '.claude/settings.json')).hooks.PreToolUse).length, 1);
+  assert.equal(ours(JSON.parse(read(root, '.codex/hooks.json')).hooks.PreToolUse).length, 1);
+
+  // The vault's hook denies a surplus test write while a task is in progress, from the project root.
+  writeFileSync(join(root, 'docs/tasks/T-01.md'), '---\ntype: task\nid: T-01\ntitle: A\nstatus: in-progress\ndeps: []\nsoft_deps: []\n---\n\n## Goal\n\nA.\n\n## Done when\n\n- a (test)\n');
+  const call = JSON.stringify({ cwd: root, hook_event_name: 'PreToolUse', tool_name: 'Write', tool_input: { file_path: 'test/a.test.mjs', content: "test('a');\ntest('b');\ntest('c');\n" } });
+  const hook = spawnSync('sh', ['-c', claude.hooks.PreToolUse[0].hooks[0].command], { cwd: root, encoding: 'utf8', input: call });
+  assert.equal(hook.status, 0);
+  assert.match(hook.stdout, /"permissionDecision":"deny"/);
+  assert.match(hook.stdout, /one test per behaviour/i);
 });

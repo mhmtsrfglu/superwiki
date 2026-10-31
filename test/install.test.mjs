@@ -320,3 +320,69 @@ test('the role files, init.mjs --skills and config.mjs work from the checkout, a
     assert.doesNotMatch(read(join(repo, 'skills', name, 'SKILL.md')), /\.\.\/(sw-)?config\//, `${name} names no ../config/ path`);
   }
 });
+
+// The test guard's registration: one PreToolUse entry per host, in the host's own place.
+const hookFiles = root => ({
+  claude: join(root, '.claude/settings.json'),
+  codex: join(root, '.codex/hooks.json'),
+  copilot: join(root, '.github/hooks/superwiki.json'),
+});
+const json = path => JSON.parse(read(path));
+const ourEntries = (entries = []) => entries.filter(entry => (entry.hooks ?? [entry]).some(hook => /sw\.mjs hook/.test(hook.command ?? hook.bash ?? '')));
+
+test('install registers the test guard hook in the three hosts\' places, a second install changes nothing, uninstall removes it and keeps a foreign hook', () => {
+  const h = home();
+  const p = project();
+  assert.equal(cli({ home: h }, 'install', '--project', p, 'all').status, 0);
+  const files = hookFiles(p);
+  const claude = json(files.claude);
+  assert.equal(claude.hooks.PreToolUse.length, 1);
+  assert.equal(claude.hooks.PreToolUse[0].matcher, 'Bash|Write|Edit|MultiEdit|NotebookEdit');
+  assert.deepEqual(claude.hooks.PreToolUse[0].hooks, [{ type: 'command', command: 'test -f docs/.sw/sw.mjs && node docs/.sw/sw.mjs hook claude || true' }]);
+  const codex = json(files.codex);
+  assert.equal(codex.hooks.PreToolUse.length, 1);
+  assert.equal(codex.hooks.PreToolUse[0].matcher, 'Bash|apply_patch');
+  assert.deepEqual(codex.hooks.PreToolUse[0].hooks, [{ type: 'command', command: 'test -f docs/.sw/sw.mjs && node docs/.sw/sw.mjs hook codex || true', timeout: 30 }]);
+  const copilot = json(files.copilot);
+  assert.equal(copilot.version, 1);
+  assert.equal(copilot.hooks.PreToolUse.length, 1);
+  assert.equal(copilot.hooks.PreToolUse[0].type, 'command');
+  assert.equal(copilot.hooks.PreToolUse[0].bash, 'test -f docs/.sw/sw.mjs && node docs/.sw/sw.mjs hook copilot || true');
+  assert.match(copilot.hooks.PreToolUse[0].powershell, /sw\.mjs hook copilot/);
+  assert.equal(copilot.hooks.PreToolUse[0].timeoutSec, 30);
+  assert.deepEqual(readdirSync(h), [], 'nothing in the home folder');
+
+  // A second install: the same files, one entry each, and a foreign entry beside ours survives.
+  const before = Object.values(files).map(read);
+  assert.equal(cli({ home: h }, 'install', '--project', p, 'all').status, 0);
+  assert.deepEqual(Object.values(files).map(read), before);
+  const foreign = { matcher: 'Bash', hooks: [{ type: 'command', command: 'echo mine' }] };
+  writeFileSync(files.claude, JSON.stringify({ permissions: { allow: ['Bash(ls)'] }, hooks: { PreToolUse: [foreign], Stop: [foreign] } }, null, 2));
+  assert.equal(cli({ home: h }, 'install', '--project', p, 'claude').status, 0);
+  const merged = json(files.claude);
+  assert.deepEqual(merged.permissions, { allow: ['Bash(ls)'] });
+  assert.deepEqual(merged.hooks.Stop, [foreign]);
+  assert.equal(merged.hooks.PreToolUse.length, 2);
+  assert.deepEqual(merged.hooks.PreToolUse[0], foreign);
+  assert.equal(ourEntries(merged.hooks.PreToolUse).length, 1);
+
+  const un = cli({ home: h }, 'uninstall', '--project', p, 'all');
+  assert.equal(un.status, 0, un.stderr);
+  assert.deepEqual(json(files.claude), { permissions: { allow: ['Bash(ls)'] }, hooks: { PreToolUse: [foreign], Stop: [foreign] } });
+  assert.ok(!existsSync(files.codex), 'an emptied hooks.json is removed');
+  assert.ok(!existsSync(files.copilot));
+});
+
+test('a home-folder install registers the claude and codex hooks under ~ and says that copilot\'s hook is per project', () => {
+  const h = home();
+  const r = cli({ home: h }, 'install', 'all');
+  assert.equal(r.status, 0, r.stderr);
+  const files = hookFiles(h);
+  assert.equal(ourEntries(json(files.claude).hooks.PreToolUse).length, 1);
+  assert.equal(ourEntries(json(files.codex).hooks.PreToolUse).length, 1);
+  assert.ok(!existsSync(files.copilot));
+  assert.match(r.stdout, /copilot.*hook.*project/i);
+  assert.equal(cli({ home: h }, 'uninstall', 'all').status, 0);
+  assert.equal(ourEntries(json(files.claude).hooks?.PreToolUse).length, 0);
+  assert.ok(!existsSync(files.codex));
+});

@@ -7,8 +7,8 @@ import { join } from 'node:path';
 import { EvalError, check, main, parseScenario, prepare } from '../evals/e2e/e2e.mjs';
 
 const E2E = new URL('../evals/e2e/', import.meta.url).pathname;
-const SCENARIOS = ['autopilot-resume', 'autopilot-run', 'autopilot-stop', 'differs-item', 'plan-draft', 'planted-defect', 'route-and-differs', 'second-review', 'service-check', 'triage-report'];
-const SKILLS = { 'triage-report': 'triage', 'plan-draft': 'plan', 'route-and-differs': 'plan-implement', 'autopilot-run': 'autopilot', 'autopilot-stop': 'autopilot', 'autopilot-resume': 'autopilot' };
+const SCENARIOS = ['autopilot-resume', 'autopilot-run', 'autopilot-stop', 'differs-item', 'plan-draft', 'planted-defect', 'route-and-differs', 'second-review', 'service-check', 'targeted-tests', 'triage-report'];
+const SKILLS = { 'triage-report': 'triage', 'plan-draft': 'plan', 'route-and-differs': 'plan-implement', 'targeted-tests': 'plan-implement', 'autopilot-run': 'autopilot', 'autopilot-stop': 'autopilot', 'autopilot-resume': 'autopilot' };
 
 const sw = (root, ...args) => spawnSync('node', [join(root, 'docs/.sw/sw.mjs'), ...args], { encoding: 'utf8', cwd: root });
 const git = (root, ...args) => spawnSync('git', args, { encoding: 'utf8', cwd: root }).stdout;
@@ -218,6 +218,14 @@ test('the shipped scenarios parse and say what they need', () => {
   assert.ok(scenarios['autopilot-resume'].pass.some(row => row.kind === 'events' && /run\\\.md/.test(row.re.source)));
   assert.ok(scenarios['autopilot-resume'].pass.some(row => row.kind === 'output' && /^\^Standing answers: /.test(row.re.source)));
   assert.ok(scenarios['autopilot-resume'].pass.some(row => row.kind === 'file' && row.path === 'docs/tasks/T-03.md'));
+
+  // The test guard: T-02 with two marked items under its own overlay, a refused write in the events,
+  // and the task closed with its tests line and no surplus.
+  assert.equal(scenarios['targeted-tests'].task, 'T-02');
+  assert.equal(scenarios['targeted-tests'].skill, 'plan-implement');
+  assert.deepEqual(scenarios['targeted-tests'].overlays, ['targeted-tests']);
+  assert.ok(scenarios['targeted-tests'].pass.some(row => row.kind === 'events' && /hook/.test(row.re.source)));
+  assert.ok(scenarios['targeted-tests'].pass.some(row => row.kind === 'file' && row.path === 'docs/tasks/T-02.md' && /surplus/.test(row.re.source)));
 });
 
 test('an events row searches the main session\'s transcript in order, and fails without the events file', () => {
@@ -230,7 +238,7 @@ test('an events row searches the main session\'s transcript in order, and fails 
     'Task: T-02', 'Skill: autopilot', 'Budget: 1', '', '## Run', '', 'x', '', '## Prompt', '', '```text', '/sw-autopilot T-02', '```', '', '## Pass', '',
     '| check | expect |', '| --- | --- |',
     '| `events` | `matches /^(?:(?!tool: Edit)[^\\n]*\\n)*text: [^\\n]*Standing/` |',
-    '| `events` | `matches /^text: Standing answers: the defaults\\. \\/ Nothing left to ask: the run starts\\.\\ntool: Edit docs\\/tasks\\/T-02\\.md\\ntool: Bash node docs\\/\\.sw\\/sw\\.mjs ready\\ntool: Agent sw-implementer\\n$/` |',
+    '| `events` | `matches /^text: Standing answers: the defaults\\. \\/ Nothing left to ask: the run starts\\.\\ntool: Edit docs\\/tasks\\/T-02\\.md\\ntool: Bash node docs\\/\\.sw\\/sw\\.mjs ready\\ntool: Agent sw-implementer\\nhook: PreToolUse:Write hook error: Superwiki: one test per behaviour\\n$/` |',
     '| `events` | `lacks /subagent/` |',
     '',
   ].join('\n'));
@@ -247,15 +255,18 @@ test('an events row searches the main session\'s transcript in order, and fails 
   const bash = tool('m3', 'Bash', { command: 'node docs/.sw/sw.mjs ready\nnode docs/.sw/sw.mjs check T-02', description: 'Next task' });
   const agent = tool('m4', 'Agent', { subagent_type: 'sw-implementer', prompt: 'T-02' });
   const inSubagent = said('m5', 'Text in the subagent.', 't-m4');
+  // A write the hook refused, in the subagent: the host answers the call with the hook's message.
+  const refused = { type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 't-x', is_error: true, content: 'PreToolUse:Write hook error: Superwiki: one test per behaviour' }] }, parent_tool_use_id: 't-m4', session_id: 's-1' };
   const events = list => writeFileSync(`${report}.jsonl`, `${list.map(event => JSON.stringify(event)).join('\n')}\n`);
 
-  // One line per text block and tool call of the main session, in order; the subagent's text is left out.
-  events([EVENTS[0], text, edit, bash, agent, inSubagent, RESULT]);
+  // One line per text block and tool call of the main session, in order, and the subagent's refused
+  // write; the subagent's text is left out.
+  events([EVENTS[0], text, edit, bash, agent, inSubagent, refused, RESULT]);
   const ordered = check(scenario, copy, report);
   assert.deepEqual(ordered.rows.map(row => row.ok), [true, true, true], JSON.stringify(ordered.rows));
 
   // The same blocks with the edit before the text: the order row fails and names the transcript.
-  events([EVENTS[0], edit, text, bash, agent, inSubagent, RESULT]);
+  events([EVENTS[0], edit, text, bash, agent, inSubagent, refused, RESULT]);
   const reversed = check(scenario, copy, report);
   assert.deepEqual(reversed.rows.map(row => row.ok), [false, false, true]);
   assert.equal(reversed.rows[0].detail, 'no match in the events');

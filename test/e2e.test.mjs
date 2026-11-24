@@ -7,8 +7,8 @@ import { join } from 'node:path';
 import { EvalError, check, main, parseScenario, prepare } from '../evals/e2e/e2e.mjs';
 
 const E2E = new URL('../evals/e2e/', import.meta.url).pathname;
-const SCENARIOS = ['autopilot-resume', 'autopilot-run', 'autopilot-stop', 'differs-item', 'plan-draft', 'planted-defect', 'route-and-differs', 'second-review', 'service-check', 'targeted-tests', 'triage-report'];
-const SKILLS = { 'triage-report': 'triage', 'plan-draft': 'plan', 'route-and-differs': 'plan-implement', 'targeted-tests': 'plan-implement', 'autopilot-run': 'autopilot', 'autopilot-stop': 'autopilot', 'autopilot-resume': 'autopilot' };
+const SCENARIOS = ['autopilot-resume', 'autopilot-run', 'autopilot-stop', 'decision-holds', 'decision-stale', 'differs-item', 'plan-draft', 'planted-defect', 'route-and-differs', 'search-today', 'second-review', 'service-check', 'targeted-tests', 'triage-report'];
+const SKILLS = { 'triage-report': 'triage', 'plan-draft': 'plan', 'route-and-differs': 'plan-implement', 'targeted-tests': 'plan-implement', 'autopilot-run': 'autopilot', 'autopilot-stop': 'autopilot', 'autopilot-resume': 'autopilot', 'decision-holds': 'brainstorm', 'decision-stale': 'brainstorm', 'search-today': 'search' };
 
 const sw = (root, ...args) => spawnSync('node', [join(root, 'docs/.sw/sw.mjs'), ...args], { encoding: 'utf8', cwd: root });
 const git = (root, ...args) => spawnSync('git', args, { encoding: 'utf8', cwd: root }).stdout;
@@ -226,6 +226,18 @@ test('the shipped scenarios parse and say what they need', () => {
   assert.deepEqual(scenarios['targeted-tests'].overlays, ['targeted-tests']);
   assert.ok(scenarios['targeted-tests'].pass.some(row => row.kind === 'events' && /hook/.test(row.re.source)));
   assert.ok(scenarios['targeted-tests'].pass.some(row => row.kind === 'file' && row.path === 'docs/tasks/T-02.md' && /surplus/.test(row.re.source)));
+
+  // The decision pair: one prompt, one decision page, and only the dependency-added overlay between
+  // them, so the verdict each asks for follows the code; neither writes before the user confirms.
+  // The search answers about today past a stale page, and writes nothing either.
+  assert.equal(scenarios['decision-stale'].prompt, scenarios['decision-holds'].prompt);
+  assert.deepEqual(scenarios['decision-holds'].overlays, ['no-dependencies']);
+  assert.deepEqual(scenarios['decision-stale'].overlays, ['no-dependencies', 'dependency-added']);
+  const verdict = (name, mode) => scenarios[name].pass.some(row => row.kind === 'output' && row.mode === mode && /no longer holds/.test(row.re.source));
+  assert.ok(verdict('decision-holds', 'lacks') && verdict('decision-stale', 'matches'));
+  assert.deepEqual(scenarios['search-today'].overlays, ['stale-page']);
+  assert.ok(scenarios['search-today'].pass.some(row => row.kind === 'output' && /items/.test(row.re.source)));
+  for (const name of ['decision-holds', 'decision-stale', 'search-today']) assert.ok(scenarios[name].pass.some(row => row.kind === 'tree'), `${name} writes nothing`);
 });
 
 test('an events row searches the main session\'s transcript in order, and fails without the events file', () => {

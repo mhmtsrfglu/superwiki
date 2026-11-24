@@ -219,6 +219,29 @@ export function resolve(vault, target) {
 
 export const taskOf = (vault, id) => vault.tasks.get(key(id)) || null;
 
+// ---------- What a page is worth today ----------
+// A page records what was true or chosen on a day. For a decision that day is its `date:`, the day
+// it was made, which is what gets cited, even where the page also carries `updated:`; for any other
+// page it is `updated:`, then `date:`. Then a task's `finished:`, or the date its file name starts
+// with; '' when the page carries none.
+export const pageDate = p => {
+  const d = p.data;
+  const day = d.type === 'decision' ? d.date || d.updated : d.updated || d.date;
+  return String(day || d.finished || (p.name.match(/^\d{4}-\d{2}-\d{2}/) || [''])[0]);
+};
+
+// The page names in `supersedes:` or `superseded_by:`. Records migrated from elsewhere write them
+// inline (`superseded_by: [[b]], [[c]]`), so each value is split on commas and its brackets dropped.
+const pageRefs = (p, field) => asList(p.data[field]).flatMap(v => String(v).split(',')).map(s => s.replace(/\[\[|\]\]/g, '').trim()).filter(Boolean);
+
+// A wiki page stands until another replaces it: the new page names the old one in `supersedes:`,
+// and the old one gets `status: superseded` and `superseded_by:`. A status that starts with
+// `superseded`, in any case (`Superseded by ADR-0005`), counts; any other status, or none, stands.
+export const isSuperseded = p => p.folder === 'wiki' && /^superseded/i.test(String(p.data.status ?? '').trim());
+
+// The pages that replaced this one, as named in its `superseded_by:`; [] while it stands.
+export const supersededBy = p => (isSuperseded(p) ? pageRefs(p, 'superseded_by') : []);
+
 // state: done | cancelled | progress | ready | blocked. wave: longest hard-dependency chain below the task.
 function derive(vault) {
   const depth = new Map();
@@ -292,6 +315,21 @@ export function lint(vault) {
       if (vault.index && !vault.index.links.some(l => resolve(vault, l.target) === p)) add('warn', 'not-in-index', p.path, 'page is not listed in index.md');
       // A source summary is reachable from the index and need not be cited yet; an area guide is found by its area, not by links.
       if (p.data.type !== 'source' && p.data.type !== 'guide' && !p.inbound.some(q => q !== vault.index && q !== vault.log)) add('warn', 'orphan-page', p.path, 'no page links here');
+      // A replaced page that still reads as standing is relied on by the next reader. The new page's
+      // `supersedes:` is the one place a script can see the replacement, so the mark is checked from it.
+      // A name with no target is a warning, not an error: a migrated vault names records it did not
+      // bring along (`supersedes: ADR-0003`), and that must not stop an unattended run.
+      for (const field of ['supersedes', 'superseded_by']) for (const name of pageRefs(p, field)) {
+        if (!resolve(vault, name)) add('warn', 'broken-link', p.path, `frontmatter \`${field}\`: [[${name}]] has no target`);
+      }
+      // An old page that already names the new one lacks only its status, which the last check reports.
+      for (const name of pageRefs(p, 'supersedes')) {
+        const old = resolve(vault, name);
+        if (!old || old === p || old.folder !== 'wiki') continue;
+        if (!pageRefs(old, 'superseded_by').some(by => resolve(vault, by) === p)) add('warn', 'superseded-unmarked', old.path, `[[${p.name}]] supersedes this page: set \`status: superseded\` and \`superseded_by: ${p.name}\``);
+      }
+      if (isSuperseded(p) && !supersededBy(p).length) add('warn', 'missing-field', p.path, '`status: superseded` needs `superseded_by`: the page that replaced this one');
+      if (!isSuperseded(p) && pageRefs(p, 'superseded_by').length) add('warn', 'missing-field', p.path, '`superseded_by` needs `status: superseded`: until then the page reads as standing');
     }
     if (p.folder === 'plans') {
       const id = /-plan$/i.test(p.name) ? p.name.replace(/-plan$/i, '') : null;
@@ -1513,7 +1551,7 @@ function explain(ctx) {
       id: t.id, title: t.title, status: t.status, state: t.state, milestone: t.milestone, priority: t.priority,
       started: t.started, finished: t.finished, deps: t.deps, softDeps: t.softDeps, dependents: t.dependents, unblocks,
       plan, guide: guidePath,
-      linked: linked.map(p => ({ path: `docs/${p.path}`, type: p.data.type || '', summary: p.data.summary || '' })),
+      linked: linked.map(p => ({ path: `docs/${p.path}`, type: p.data.type || '', date: pageDate(p), superseded: isSuperseded(p), supersededBy: supersededBy(p), summary: p.data.summary || '' })),
     },
     text: [
       `${t.id}  ${t.title}`,
@@ -1526,10 +1564,21 @@ function explain(ctx) {
       `plan: ${plan ?? 'none'}`,
       `area guide: ${guidePath ?? 'none'}`,
       ...(linked.length
-        ? ['linked pages:', ...linked.map(p => `  docs/${p.path}  [${p.data.type || '?'}]  ${p.data.summary || ''}`)]
+        ? ['linked pages:', ...linked.map(p => `  docs/${p.path}  [${pageLabel(vault, p)}]  ${p.data.summary || ''}`)]
         : ['linked pages: none']),
     ].join('\n'),
   };
+}
+
+// What a page is: a task with its state, a raw source, or a wiki page's type.
+const pageKind = (vault, p) => (p.folder === 'tasks' ? `task ${taskOf(vault, p.data.id || p.name)?.state ?? ''}` : p.folder === 'raw' ? 'raw' : p.data.type || p.folder);
+
+// A page says what was true or chosen on its day, so wherever pages are listed the day is printed
+// with the kind, and a page another has replaced names that page: a reader can tell how far to
+// trust a page before opening it.
+function pageLabel(vault, p) {
+  const by = supersededBy(p);
+  return `${pageKind(vault, p)}${pageDate(p) ? ` ${pageDate(p)}` : ''}${isSuperseded(p) ? `, superseded${by.length ? ` by ${by.join(', ')}` : ''}` : ''}`;
 }
 
 // Log entries (heading plus first body line) that mention any of the terms. The log is not part of
@@ -1559,17 +1608,16 @@ function searchCommand({ docs, vault, args }) {
   const shownLog = logHits.slice(-LOG_HITS_SHOWN);
   // Plans and raw sources have no summary; their first heading says what they are.
   const about = p => p.data.summary || p.data.title || (p.body.match(/^#+\s+(.*)$/m) || [])[1] || '';
-  const kind = p => (p.folder === 'tasks' ? `task ${taskOf(vault, p.data.id || p.name)?.state ?? ''}` : p.folder === 'raw' ? 'raw' : p.data.type || p.folder);
   // The matching line, under the heading it sits in, so that an answer can cite the section.
   const hitLine = h => (h.line ? `\n    ${h.heading ? `[${h.heading}] ` : ''}${h.line}` : '');
   return {
     data: {
-      pages: hits.map(h => ({ path: `docs/${h.page.path}`, type: kind(h.page), summary: about(h.page), termsMatched: h.matched, line: h.line, heading: h.heading })),
+      pages: hits.map(h => ({ path: `docs/${h.page.path}`, type: pageKind(vault, h.page), date: pageDate(h.page), superseded: isSuperseded(h.page), supersededBy: supersededBy(h.page), summary: about(h.page), termsMatched: h.matched, line: h.line, heading: h.heading })),
       log: shownLog,
     },
     text: [
       `pages (${hits.length}), best match first; a page matching one common word is a weak match`,
-      ...hits.map(h => `docs/${h.page.path}  [${kind(h.page)}]  ${about(h.page)}${hitLine(h)}`),
+      ...hits.map(h => `docs/${h.page.path}  [${pageLabel(vault, h.page)}]  ${about(h.page)}${hitLine(h)}`),
       `log entries (${logHits.length}${logHits.length > LOG_HITS_SHOWN ? `, last ${LOG_HITS_SHOWN} shown` : ''})`,
       ...shownLog,
     ].join('\n'),

@@ -211,6 +211,29 @@ export function resolve(vault, target) {
 
 export const taskOf = (vault, id) => vault.tasks.get(key(id)) || null;
 
+// ---------- What a page is worth today ----------
+// A page records what was true or chosen on a day. For a decision that day is its `date:`, the day
+// it was made, which is what gets cited, even where the page also carries `updated:`; for any other
+// page it is `updated:`, then `date:`. Then a task's `finished:`, or the date its file name starts
+// with; '' when the page carries none.
+export const pageDate = p => {
+  const d = p.data;
+  const day = d.type === 'decision' ? d.date || d.updated : d.updated || d.date;
+  return String(day || d.finished || (p.name.match(/^\d{4}-\d{2}-\d{2}/) || [''])[0]);
+};
+
+// The page names in `supersedes:` or `superseded_by:`. Records migrated from elsewhere write them
+// inline (`superseded_by: [[b]], [[c]]`), so each value is split on commas and its brackets dropped.
+const pageRefs = (p, field) => asList(p.data[field]).flatMap(v => String(v).split(',')).map(s => s.replace(/\[\[|\]\]/g, '').trim()).filter(Boolean);
+
+// A wiki page stands until another replaces it: the new page names the old one in `supersedes:`,
+// and the old one gets `status: superseded` and `superseded_by:`. A status that starts with
+// `superseded`, in any case (`Superseded by ADR-0005`), counts; any other status, or none, stands.
+export const isSuperseded = p => p.folder === 'wiki' && /^superseded/i.test(String(p.data.status ?? '').trim());
+
+// The pages that replaced this one, as named in its `superseded_by:`; [] while it stands.
+export const supersededBy = p => (isSuperseded(p) ? pageRefs(p, 'superseded_by') : []);
+
 // state: done | cancelled | progress | ready | blocked. wave: longest hard-dependency chain below the task.
 function derive(vault) {
   const depth = new Map();
@@ -284,6 +307,21 @@ export function lint(vault) {
       if (vault.index && !vault.index.links.some(l => resolve(vault, l.target) === p)) add('warn', 'not-in-index', p.path, 'page is not listed in index.md');
       // A source summary is reachable from the index and need not be cited yet; an area guide is found by its area, not by links.
       if (p.data.type !== 'source' && p.data.type !== 'guide' && !p.inbound.some(q => q !== vault.index && q !== vault.log)) add('warn', 'orphan-page', p.path, 'no page links here');
+      // A replaced page that still reads as standing is relied on by the next reader. The new page's
+      // `supersedes:` is the one place a script can see the replacement, so the mark is checked from it.
+      // A name with no target is a warning, not an error: a migrated vault names records it did not
+      // bring along (`supersedes: ADR-0003`), and that must not stop an unattended run.
+      for (const field of ['supersedes', 'superseded_by']) for (const name of pageRefs(p, field)) {
+        if (!resolve(vault, name)) add('warn', 'broken-link', p.path, `frontmatter \`${field}\`: [[${name}]] has no target`);
+      }
+      // An old page that already names the new one lacks only its status, which the last check reports.
+      for (const name of pageRefs(p, 'supersedes')) {
+        const old = resolve(vault, name);
+        if (!old || old === p || old.folder !== 'wiki') continue;
+        if (!pageRefs(old, 'superseded_by').some(by => resolve(vault, by) === p)) add('warn', 'superseded-unmarked', old.path, `[[${p.name}]] supersedes this page: set \`status: superseded\` and \`superseded_by: ${p.name}\``);
+      }
+      if (isSuperseded(p) && !supersededBy(p).length) add('warn', 'missing-field', p.path, '`status: superseded` needs `superseded_by`: the page that replaced this one');
+      if (!isSuperseded(p) && pageRefs(p, 'superseded_by').length) add('warn', 'missing-field', p.path, '`superseded_by` needs `status: superseded`: until then the page reads as standing');
     }
     if (p.folder === 'plans') {
       const id = /-plan$/i.test(p.name) ? p.name.replace(/-plan$/i, '') : null;

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseFrontmatter, extractWikilinks, buildVault, lint, summary, tasksIn, nextId, taskOf, search, unblockedBy, guideFor, closingSummary } from '../src/core.js';
+import { parseFrontmatter, extractWikilinks, buildVault, lint, summary, tasksIn, nextId, taskOf, search, unblockedBy, guideFor, closingSummary, isSuperseded, supersededBy } from '../src/core.js';
 
 const task = (id, fields = {}, body = '') => ({
   path: `tasks/${id}.md`,
@@ -193,4 +193,38 @@ test('area guide: found by area, exempt from the orphan warning', () => {
   assert.equal(guideFor(v, 'p').name, 'guide-p');
   assert.equal(guideFor(v, 'M'), null);
   assert.deepEqual(lint(v), []);
+});
+
+// A decision is replaced by a newer page, never edited away. Only the new page's `supersedes:` shows
+// the replacement to a script, so lint reads it and asks for the mark on the old page.
+test('a superseded page: lint asks for the mark on the old page, and the page names what replaced it', () => {
+  const decision = (name, extra = '') => page(name, 'See [[other]].', `type: decision\nsummary: A choice.\ndate: 2026-09-01\n${extra}`);
+  const other = page('other', 'Links [[old-choice]] and [[new-choice]].');
+  const findings = files => lint(buildVault([index('old-choice', 'new-choice', 'other'), other, ...files])).map(f => `${f.level} ${f.code} ${f.path}`);
+
+  assert.deepEqual(findings([decision('old-choice'), decision('new-choice', 'supersedes: old-choice')]), ['warn superseded-unmarked wiki/old-choice.md']);
+  assert.deepEqual(
+    findings([decision('old-choice', 'status: superseded'), decision('new-choice', 'supersedes: old-choice')]),
+    ['warn missing-field wiki/old-choice.md', 'warn superseded-unmarked wiki/old-choice.md'],
+    'the mark names the page that replaced it',
+  );
+  assert.deepEqual(findings([decision('old-choice', 'status: superseded\nsuperseded_by: "[[new-choice]]"'), decision('new-choice', 'supersedes: [old-choice]')]), []);
+  assert.deepEqual(findings([decision('old-choice', 'status: accepted'), decision('new-choice', 'status: active')]), [], 'any other status stands');
+  assert.deepEqual(
+    findings([decision('old-choice', 'status: accepted\nsuperseded_by: new-choice'), decision('new-choice', 'supersedes: old-choice')]),
+    ['warn missing-field wiki/old-choice.md'],
+    '`superseded_by` needs the status, and one finding says so',
+  );
+  assert.deepEqual(findings([decision('old-choice'), decision('new-choice', 'supersedes: gone-choice')]), ['warn broken-link wiki/new-choice.md']);
+  // Records migrated from elsewhere: the status says more than `superseded`, the links are written
+  // inline, and a name with no target is a record the migration did not bring along, so only a warning.
+  assert.deepEqual(
+    findings([decision('old-choice', 'status: Superseded by ADR-0005\nsuperseded_by: [[new-choice]], [[ADR-0005]]'), decision('new-choice', 'supersedes: old-choice, ADR-0003')]),
+    ['warn broken-link wiki/new-choice.md', 'warn broken-link wiki/old-choice.md'],
+  );
+
+  const v = buildVault([decision('old-choice', 'status: SUPERSEDED by new-choice\nsuperseded_by: [[new-choice]], [[newer-choice]]'), decision('new-choice', 'supersedes: old-choice')]);
+  const [fresh, old] = v.pages;
+  assert.deepEqual([isSuperseded(old), supersededBy(old)], [true, ['new-choice', 'newer-choice']]);
+  assert.deepEqual([isSuperseded(fresh), supersededBy(fresh)], [false, []]);
 });

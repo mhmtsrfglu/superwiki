@@ -6,7 +6,7 @@ import { createServer } from 'node:http';
 import { basename, dirname, join, resolve as resolvePath } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { boardFinding, indexWithBoard, taskBoard } from './board.js';
-import { VAULT_FOLDERS, buildVault, guideFor, lint, nextId, resolve, search, summary, taskOf, tasksIn, unblockedBy } from './core.js';
+import { VAULT_FOLDERS, buildVault, guideFor, isSuperseded, lint, nextId, pageDate, resolve, search, summary, supersededBy, taskOf, tasksIn, unblockedBy } from './core.js';
 import { formatStartContext, startContext } from './doctor.js';
 import { decide } from './guard.js';
 import { SESSION_TOOLS, findSession } from './sessions.js';
@@ -185,7 +185,7 @@ function explain(ctx) {
       id: t.id, title: t.title, status: t.status, state: t.state, milestone: t.milestone, priority: t.priority,
       started: t.started, finished: t.finished, deps: t.deps, softDeps: t.softDeps, dependents: t.dependents, unblocks,
       plan, guide: guidePath,
-      linked: linked.map(p => ({ path: `docs/${p.path}`, type: p.data.type || '', summary: p.data.summary || '' })),
+      linked: linked.map(p => ({ path: `docs/${p.path}`, type: p.data.type || '', date: pageDate(p), superseded: isSuperseded(p), supersededBy: supersededBy(p), summary: p.data.summary || '' })),
     },
     text: [
       `${t.id}  ${t.title}`,
@@ -198,10 +198,21 @@ function explain(ctx) {
       `plan: ${plan ?? 'none'}`,
       `area guide: ${guidePath ?? 'none'}`,
       ...(linked.length
-        ? ['linked pages:', ...linked.map(p => `  docs/${p.path}  [${p.data.type || '?'}]  ${p.data.summary || ''}`)]
+        ? ['linked pages:', ...linked.map(p => `  docs/${p.path}  [${pageLabel(vault, p)}]  ${p.data.summary || ''}`)]
         : ['linked pages: none']),
     ].join('\n'),
   };
+}
+
+// What a page is: a task with its state, a raw source, or a wiki page's type.
+const pageKind = (vault, p) => (p.folder === 'tasks' ? `task ${taskOf(vault, p.data.id || p.name)?.state ?? ''}` : p.folder === 'raw' ? 'raw' : p.data.type || p.folder);
+
+// A page says what was true or chosen on its day, so wherever pages are listed the day is printed
+// with the kind, and a page another has replaced names that page: a reader can tell how far to
+// trust a page before opening it.
+function pageLabel(vault, p) {
+  const by = supersededBy(p);
+  return `${pageKind(vault, p)}${pageDate(p) ? ` ${pageDate(p)}` : ''}${isSuperseded(p) ? `, superseded${by.length ? ` by ${by.join(', ')}` : ''}` : ''}`;
 }
 
 // Log entries (heading plus first body line) that mention any of the terms. The log is not part of
@@ -231,17 +242,16 @@ function searchCommand({ docs, vault, args }) {
   const shownLog = logHits.slice(-LOG_HITS_SHOWN);
   // Plans and raw sources have no summary; their first heading says what they are.
   const about = p => p.data.summary || p.data.title || (p.body.match(/^#+\s+(.*)$/m) || [])[1] || '';
-  const kind = p => (p.folder === 'tasks' ? `task ${taskOf(vault, p.data.id || p.name)?.state ?? ''}` : p.folder === 'raw' ? 'raw' : p.data.type || p.folder);
   // The matching line, under the heading it sits in, so that an answer can cite the section.
   const hitLine = h => (h.line ? `\n    ${h.heading ? `[${h.heading}] ` : ''}${h.line}` : '');
   return {
     data: {
-      pages: hits.map(h => ({ path: `docs/${h.page.path}`, type: kind(h.page), summary: about(h.page), termsMatched: h.matched, line: h.line, heading: h.heading })),
+      pages: hits.map(h => ({ path: `docs/${h.page.path}`, type: pageKind(vault, h.page), date: pageDate(h.page), superseded: isSuperseded(h.page), supersededBy: supersededBy(h.page), summary: about(h.page), termsMatched: h.matched, line: h.line, heading: h.heading })),
       log: shownLog,
     },
     text: [
       `pages (${hits.length}), best match first; a page matching one common word is a weak match`,
-      ...hits.map(h => `docs/${h.page.path}  [${kind(h.page)}]  ${about(h.page)}${hitLine(h)}`),
+      ...hits.map(h => `docs/${h.page.path}  [${pageLabel(vault, h.page)}]  ${about(h.page)}${hitLine(h)}`),
       `log entries (${logHits.length}${logHits.length > LOG_HITS_SHOWN ? `, last ${LOG_HITS_SHOWN} shown` : ''})`,
       ...shownLog,
     ].join('\n'),

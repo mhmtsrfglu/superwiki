@@ -23,7 +23,7 @@ test('new vault with tasks: files, config, an index with the task list, clean li
   run(root, '--tasks', '--areas', 'M=Mobile,B=Backend');
   const expected = [
     'docs/index.md', 'docs/log.md', 'docs/raw/assets', 'docs/wiki', 'docs/tasks', 'docs/plans', 'docs/viewer.html',
-    'docs/.sw/sw.mjs', 'docs/.sw/templates/task.md', 'docs/.sw/templates/plan.md', 'docs/.sw/templates/guide.md',
+    'docs/.sw/sw.mjs', 'docs/.sw/templates/page.md', 'docs/.sw/templates/decision.md', 'docs/.sw/templates/task.md', 'docs/.sw/templates/plan.md', 'docs/.sw/templates/guide.md',
     'AGENTS.md', 'CLAUDE.md',
   ];
   for (const path of expected) assert.ok(existsSync(join(root, path)), path);
@@ -64,6 +64,7 @@ test('wiki-only vault leaves the task module out', () => {
   run(root, '--no-tasks');
   assert.ok(!existsSync(join(root, 'docs/tasks')));
   assert.ok(!existsSync(join(root, 'docs/.sw/templates/task.md')));
+  assert.ok(existsSync(join(root, 'docs/.sw/templates/decision.md')), 'a wiki without tasks records decisions too');
   assert.doesNotMatch(read(root, 'docs/index.md'), /sw:board|## Tasks/);
   const agents = read(root, 'AGENTS.md');
   assert.doesNotMatch(agents, /tasks\/<ID>|Tasks:|sw-plan|sw-implement|sw-plan-implement|sw-explain|sw-review|sw\.mjs index/);

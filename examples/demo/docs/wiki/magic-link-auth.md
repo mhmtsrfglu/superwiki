@@ -2,7 +2,9 @@
 type: decision
 summary: Sign-in uses emailed magic links instead of passwords.
 date: 2026-08-29
-status: accepted
+status: active
+supersedes:
+superseded_by:
 ---
 
 # Decision: magic-link sign-in
@@ -14,6 +16,10 @@ The [[home-cook-persona]] signs in rarely and on more than one device. In the in
 ## Decision
 Sign-in is by a one-time link sent to the user's email. There are no passwords. A session lasts 90 days
 on a device and is renewed on use.
+
+## Holds while
+- Users sign in rarely: the median gap between sign-ins is over two weeks.
+- Email delivery is reliable: more than 98% of links arrive within a minute.
 
 ## Consequences
 - No password reset flow to build or secure.

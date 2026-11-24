@@ -157,7 +157,7 @@ function writeVault(docs, tasks, report) {
   report.write(join(docs, '.sw', '.gitignore'), 'data.js\nserver.json\n');
   report.copy(join(ASSETS, 'sw.mjs'), join(docs, '.sw', 'sw.mjs'));
   report.copy(join(ASSETS, 'viewer.html'), join(docs, 'viewer.html'));
-  for (const template of ['page.md', ...(tasks ? ['task.md', 'plan.md', 'guide.md'] : [])]) {
+  for (const template of ['page.md', 'decision.md', ...(tasks ? ['task.md', 'plan.md', 'guide.md'] : [])]) {
     report.copy(join(ASSETS, 'templates', template), join(docs, '.sw', 'templates', template));
   }
 }

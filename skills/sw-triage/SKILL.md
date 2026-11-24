@@ -18,14 +18,15 @@ Run commands from the project root.
    node docs/.sw/sw.mjs search <three to six distinctive words>
    ```
 
-   Each result has the page's type and summary and the first matching line; matching log entries follow, with their first line. A page is listed when any word matches, best match first, so the tail of the list is often noise.
+   Each result has the page's kind, its day and its summary, and the first matching line; a page another has replaced says so, `[decision 2026-09-01, superseded by <page>]`. Matching log entries follow, with their first line. A page is listed when any word matches, best match first, so the tail of the list is often noise.
 
    The vault is the only record of earlier sessions this skill can read. On Copilot the user can run `/chronicle search <words>` (Copilot CLI) or `/chronicle:search <words>` (VS Code Copilot Chat), which searches Copilot's own session store, to find an earlier session of the project and resume it; name it when the vault has no record, and say that the skill cannot run it.
 3. **Look at what changed recently**: `tail -40 docs/log.md` and `node docs/.sw/sw.mjs ready` (the "in progress" part). Work finished or under way in the same area just before the problem appeared is a suspect.
-4. **Read at most four files**, plans included, in this order of preference: `lesson` pages, `decision` pages, tasks that touched the same area (done or in progress), then the rest. Read a task's plan only if steps 2 and 3 point at that task as the cause.
-5. **Report in the user's language**, under these headings. Give the source of each claim: a page as `[[page]]`, a log entry as "log, <date>".
+4. **Read at most four files**, plans included, in this order of preference: `lesson` pages, `decision` pages, tasks that touched the same area (done or in progress), then the rest. Of a page marked `superseded`, read the page that replaced it. Read a task's plan only if steps 2 and 3 point at that task as the cause.
+5. **Report in the user's language**, under these headings. Give the source of each claim with its day: a page as `[[page]] (<day>)`, a log entry as "log, <date>".
    - **Seen before**: earlier occurrences, what the cause was, how it was fixed. If no page records this problem, say plainly that the vault has no record of it; do not stretch a weak match. If a recorded fix exists and the problem is back, say so: it is a regression.
-   - **Lessons that apply**: rules or warnings from lesson and decision pages that bear on this problem.
+   - **Lessons that apply**: what the `lesson` pages that bear on this problem warn of. A lesson records a problem that happened, so its warning is given as written.
+   - **Decisions it touches**: each `decision` page that bears on the problem, in a line, with the facts under its "Holds while", or, for a page without that section, the reason its Decision gives. A decision is a choice made on its day, not a rule the code is known to follow: a fact the symptom or a recent change contradicts is a likely cause, and goes under the next heading with the check that would confirm it. Leave the heading out when no decision bears on the problem.
    - **Likely causes**: ranked, each with the evidence for it and one concrete check that would confirm or rule it out. Where the vault records no cause, these are hypotheses drawn from what the pages say about the area: label them as hypotheses.
    - **Recent changes in the area**: tasks and log entries from step 3.
    - **Gaps**: what the vault does not cover and would have helped.
@@ -42,3 +43,4 @@ When the cause is known and fixed (in this session or a later one), offer to sav
 - Reading code or reproducing the bug before searching. Triage is the lookup; debugging comes after, with the report in hand.
 - Opening every search result. Summaries and matching lines decide which four are worth reading.
 - Presenting a guess as history. "Seen before" is only for what a page actually records.
+- Presenting a decision as a rule the code follows. It says what was chosen and what the choice rested on; whether the code still matches is one of the checks.

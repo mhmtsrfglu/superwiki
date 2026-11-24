@@ -13,6 +13,7 @@ Two passes. The first is a script and costs almost nothing. The second reads pag
 2. **Fix broken links first, then run lint again**, because one rename produces several findings (`broken-link` in every page that linked the old name, plus `not-in-index` and `orphan-page` for the new one).
    - A rename is established when exactly one page is reported `not-in-index` or `orphan-page` and its name is a variation of the broken target. Re-point every `[[old]]` to `[[new]]` in the files lint named, including `index.md` and task files.
    - Two candidates, or no resemblance: do not guess. Report it.
+   - A `broken-link` in a page's `supersedes:` or `superseded_by:` is a warning, not an error: a migrated vault names records it did not bring along. Fix it the same way, by re-pointing the field's value, when the target is clear; otherwise report it.
 3. Fix what else has one correct answer:
 
    | Finding | Fix |
@@ -22,6 +23,8 @@ Two passes. The first is a script and costs almost nothing. The second reads pag
    | `missing-field` `summary` | copy it from the page's line in `index.md`; if there is none, read the page and write it |
    | `missing-field` `type` | read that page, write the field |
    | `missing-date` | fill from `git log --follow --format=%ad --date=short -- <file>` when the project is under git and the date is unambiguous |
+   | `superseded-unmarked` | a newer page names this one in its `supersedes:`. In the page lint names, set `status: superseded` and `superseded_by:` to the page the message names; change nothing else in it |
+   | `missing-field` `superseded_by` needs `status: superseded`, where the page it names lists this one in its `supersedes:` | set `status: superseded` in the page lint names; change nothing else in it |
 
 4. Report the rest and let the user decide. Do not change a task's `status` or `deps` to silence a finding.
 
@@ -33,6 +36,8 @@ Two passes. The first is a script and costs almost nothing. The second reads pag
    | `duplicate-name` | one of the pages must be renamed and every link to it re-pointed |
    | `broken-link` with no clear target, `orphan-plan`, `unknown-dep` | the page may be missing or the reference stale |
    | `orphan-page` | may be fine; may want a link from a related page |
+   | `missing-field` `status: superseded` needs `superseded_by`, with no `superseded-unmarked` for the same page | the page says it was replaced, and no page claims to replace it; only the user knows which one did |
+   | `missing-field` `superseded_by` needs `status: superseded`, where the page it names does not list this one in its `supersedes:` | the page names a replacement that does not claim it; either the field or the status is out of date, and only the user knows which |
 
 5. Run lint again and state the before and after counts.
 
@@ -43,7 +48,8 @@ Offer it with its size: "The wiki has N pages; a semantic review reads them. Run
 1. Read `index.md`. Collect follow-ups that ingests deferred: find the last lint entry with `grep -n '^## \[.*\] lint' docs/log.md | tail -1` and read the log from that line to the end (the whole log only if there is no lint entry and it is short; otherwise `tail -60`).
 2. Read the wiki pages. Up to about twenty pages, read them all; beyond that, go group by group (same `type`, or linked to each other). Open a file in `raw/` only to settle whether two pages really contradict each other. Look for:
    - claims that contradict each other;
-   - a `decision` page superseded by a later one without saying so;
+   - a `decision` page that a later page contradicts or replaces while neither says so: the later page lacks `supersedes:`, so pass 1 could not see it. The fix is that field, and the mark on the old page that pass 1 then asks for;
+   - a `decision` page with no "Holds while" section: offer to add one from the facts its Context and Decision give as the reason, inventing none, so that a later reader can check them;
    - concepts named on several pages that have no page of their own;
    - pages that should link to each other and do not;
    - summaries or titles that no longer match the page;

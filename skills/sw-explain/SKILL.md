@@ -11,7 +11,7 @@ Run commands from the project root.
 
 ## Steps
 
-1. `node docs/.sw/sw.mjs explain <ID>`. It prints the task's state, what it depends on, what it blocks, what becomes ready when it is done, its plan and the wiki pages it links, each with a one-line summary. No id given: ask which task, offering the ones from `node docs/.sw/sw.mjs ready`.
+1. `node docs/.sw/sw.mjs explain <ID>`. It prints the task's state, what it depends on, what it blocks, what becomes ready when it is done, its plan and the wiki pages it links, each with its kind, its day and a one-line summary; a page another has replaced names that page, `[decision 2026-09-01, superseded by <page>]`. No id given: ask which task, offering the ones from `node docs/.sw/sw.mjs ready`.
 
    The state is derived: `ready` is a `todo` task whose dependencies are done, `blocked` is a `todo` task still waiting on one, `progress` is `in-progress`. Say it in words, not as a label.
 2. Read `docs/tasks/<ID>.md`.
@@ -21,7 +21,7 @@ Run commands from the project root.
    - nothing else. Summaries from step 1 stand in for the other pages.
 4. **Answer in the user's language**, in this order, one to a few sentences each:
    - **What**: the task in plain words, without restating its title.
-   - **Why**: the reason it exists and the decision or source behind it, as `[[page]]`. If neither the task nor the page you read gives a reason, say the vault does not record one.
+   - **Why**: the reason it exists and the decision or source behind it, as `[[page]]` with its day. A decision is given as the choice made on that day, not as a rule in force; when step 1 marks it `superseded`, say so and name the page that replaced it, since the task then rests on a choice that no longer stands. If neither the task nor the page you read gives a reason, say the vault does not record one.
    - **Depends on**: each dependency with its state. A dependency listed under "depends on" must be done before the task can start; one under "soft depends on" lets it start but must be done before it can finish.
    - **Blocks**: the tasks waiting on it, and which of them become ready the moment it is done.
    - **What changes when it is done**: for the product or the user, from "Done when", and for the project, from what it unblocks.

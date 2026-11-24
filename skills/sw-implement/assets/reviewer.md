@@ -28,6 +28,8 @@ With or without `Recheck:`, the review covers the whole change.
    - `important`: a real defect or gap that does not make the result wrong today.
    - `minor`: clarity, naming, small cleanups.
 
+   A recorded decision is a choice made on its day, not a rule, and it excuses no defect. Where the change follows a `decision` page or an earlier choice whose reason the code contradicts today, that is an `important` finding, with the file and line that show it; the user decides whether the decision still stands. A decision the task's "Notes" show the user has already ruled on is not raised again.
+
 A check needs the environment when it starts a service, needs a running stack or changes data. It runs only when your input lists it as allowed; one that is not listed is not allowed, whether or not the task has a plan. A claim only such a check could test goes under `Not checked:` with what it needs.
 
 ## How to read

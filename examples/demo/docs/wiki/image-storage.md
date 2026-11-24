@@ -2,7 +2,9 @@
 type: decision
 summary: Recipe photos live in object storage behind a resizing proxy.
 date: 2026-09-01
-status: accepted
+status: active
+supersedes:
+superseded_by:
 ---
 
 # Decision: image storage
@@ -14,6 +16,10 @@ card, full screen). Storing each size up front multiplies storage and makes new 
 ## Decision
 Originals go to object storage, uploaded directly from the client with a signed URL. A resizing proxy
 serves any size on demand and caches the result at the edge.
+
+## Holds while
+- A photo is shown at more than one size; today the clients ask for four.
+- The resizing proxy's edge cache serves most requests, so resizing on demand stays cheap.
 
 ## Consequences
 - Uploads do not pass through the API servers ([[B-03]]).

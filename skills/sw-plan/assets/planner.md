@@ -19,6 +19,7 @@ Read code to answer three questions: which files change, which existing pattern 
 - **Locate, then open.** Search for the symbol, string or file name first. Open the range the search points at, not the file.
 - **One example per pattern.** Find the closest existing case and read that part of it. Do not compare several.
 - **Trust what is stated.** The task, the guide, generated types and schemas say what exists. Check a stated fact in code only where the plan would be wrong if the fact were false.
+- **A recorded decision is a choice made on its day, not a rule.** A `decision` page the plan depends on rests on the facts under its "Holds while", or, without that section, on the reason its Decision gives. Check them where the plan would be wrong if they were false, and a requirement of the task the same way. One that today's code or data contradicts goes under `Challenges:` in your return, and the plan follows the task as written. A decision the task's "Notes" show the user has already ruled on, or a challenge your input answers, is not raised again: the plan follows the answer. A page marked `status: superseded` is not followed: read the page its `superseded_by:` names.
 - **Batch lookups.** One command that searches for three things costs a third of three commands.
 - **Never read twice.**
 
@@ -50,6 +51,7 @@ A short message, not the plan:
 
 - `Approach:` three lines at most.
 - `Questions:` what only the user can answer, each with the answer the plan assumes. Leave out if none.
+- `Challenges:` a requirement of the task, or a `decision` page the plan depends on, that today's code or data contradicts. One line each: what it says, by its id or its `[[page]]` and day; what the code shows, with the file and line or the command and its output; and what you would do instead. Only with that evidence: a doubt you could not check is a `Questions:` line. A decision the task's "Notes" show the user has already ruled on, or a challenge your input answers, is not raised again. The plan follows the task as written until the user answers. Leave out if none.
 - `Split:` if the work does not fit one session, one line per new task: its title, its dependencies (and whether `<ID>` must wait for it), and the "Done when" items of `<ID>` it takes over, by their `D<n>` ids as the items stand before the split. The plan covers only the items that stay. Leave out if not needed.
 - `Marks:` in every round: the first words of each "Done when" item that `## Verification` proves by a test, enough to find it and never a number, separated by `;`; `Marks: none` if no item is.
 - If the area has a guide, `Guide:` facts you had to find in the code that it did not state and the next task in this area would need. One line each, at most eight.

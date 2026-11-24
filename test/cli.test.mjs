@@ -106,10 +106,35 @@ test('search: pages by match, with the task state; raw sources with the heading 
   writeFileSync(join(root, 'docs/raw/2026-01-01-notes.md'), '# Notes\n\n## Open\n\nTask T-02 waits.\n');
   const out = sw(root, 'search', 'Task', 'T-02').stdout;
   assert.match(out, /^pages \(3\)[^\n]*\ndocs\/tasks\/T-02\.md {2}\[task blocked\]/);
-  assert.match(out, /\ndocs\/raw\/2026-01-01-notes\.md {2}\[raw\] {2}Notes\n {4}\[Open\] Task T-02 waits\.\n/);
+  assert.match(out, /\ndocs\/raw\/2026-01-01-notes\.md {2}\[raw 2026-01-01\] {2}Notes\n {4}\[Open\] Task T-02 waits\.\n/);
   const json = JSON.parse(sw(root, 'search', '--json', 'Task', 'T-02').stdout);
-  assert.deepEqual(json.pages.find(p => p.type === 'raw'), { path: 'docs/raw/2026-01-01-notes.md', type: 'raw', summary: 'Notes', termsMatched: 2, line: 'Task T-02 waits.', heading: 'Open' });
+  assert.deepEqual(json.pages.find(p => p.type === 'raw'), { path: 'docs/raw/2026-01-01-notes.md', type: 'raw', date: '2026-01-01', superseded: false, supersededBy: [], summary: 'Notes', termsMatched: 2, line: 'Task T-02 waits.', heading: 'Open' });
   assert.equal(sw(root, 'search').status, 2);
+});
+
+// A page says what was true on its day: search and explain print the day with the page's kind, and
+// a decision another page replaced names that page, so nobody relies on it unawares.
+test('search and explain: a page is listed with its day, a superseded decision with the page that replaced it', () => {
+  const root = vault();
+  const page = (name, fields) => writeFileSync(join(root, `docs/wiki/${name}.md`), `---\nsummary: Where exports are kept.\n${fields}---\nExports are kept somewhere.\n`);
+  page('2026-09-01-exports-in-memory', 'type: decision\ndate: 2026-09-01\nstatus: superseded\nsuperseded_by: 2026-10-20-exports-on-disk\n');
+  page('2026-10-20-exports-on-disk', 'type: decision\ndate: 2026-10-20\nstatus: active\nsupersedes: 2026-09-01-exports-in-memory\n');
+  page('exports-format', 'type: concept\ndate: 2026-06-01\nupdated: 2026-10-02\n');
+  page('exports-location', 'type: decision\ndate: 2026-07-01\nupdated: 2026-10-30\n');
+  page('2026-08-15-exports-review', 'type: analysis\n');
+  writeFileSync(join(root, 'docs/tasks/T-01.md'), `${read(root, 'docs/tasks/T-01.md')}\n## Sources\n\n- [[2026-09-01-exports-in-memory]]\n`);
+
+  const out = sw(root, 'search', 'exports').stdout;
+  assert.match(out, /\ndocs\/wiki\/2026-09-01-exports-in-memory\.md {2}\[decision 2026-09-01, superseded by 2026-10-20-exports-on-disk\] {2}Where/);
+  assert.match(out, /\ndocs\/wiki\/2026-10-20-exports-on-disk\.md {2}\[decision 2026-10-20\] {2}Where/);
+  assert.match(out, /\ndocs\/wiki\/exports-format\.md {2}\[concept 2026-10-02\] {2}Where/, 'a page\'s day is its `updated:`');
+  assert.match(out, /\ndocs\/wiki\/exports-location\.md {2}\[decision 2026-07-01\] {2}Where/, 'a decision\'s is its `date:`, the day it was made, also where it carries `updated:`');
+  assert.match(out, /\ndocs\/wiki\/2026-08-15-exports-review\.md {2}\[analysis 2026-08-15\] {2}Where/, 'or the date its file name starts with');
+  const old = JSON.parse(sw(root, 'search', '--json', 'exports').stdout).pages.find(p => p.superseded);
+  assert.deepEqual([old.date, old.supersededBy], ['2026-09-01', ['2026-10-20-exports-on-disk']]);
+
+  assert.match(sw(root, 'explain', 'T-01').stdout, /linked pages:\n {2}docs\/wiki\/2026-09-01-exports-in-memory\.md {2}\[decision 2026-09-01, superseded by 2026-10-20-exports-on-disk\]/);
+  assert.doesNotMatch(sw(root, 'lint').stdout, /superseded-unmarked|broken-link/);
 });
 
 test('lint: exit code follows errors', () => {

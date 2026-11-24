@@ -22,11 +22,20 @@ Wiki:
 
 - Link vault pages as `[[file-name]]`; file names are unique across the vault. Use normal markdown links for `raw/` files and URLs, and plain paths for code.
 - When you add or rename a wiki page, update its line in `index.md`.
-- Answer questions from the vault with `sw-search`: index first, every claim with its reference.
+- Answer questions from the vault with `sw-search`: index first, every claim with its reference and its day.
+- A decision that changes gets a new page, never an edit (`docs/.sw/templates/decision.md`): the new page names the old one in `supersedes:`, and the old page gets `status: superseded` and `superseded_by:` in the same change.
 {{^tasks}}
 - When you change the project, append one `change` entry to `log.md`: what changed and why, in a line.
 - `node docs/.sw/sw.mjs search <words>` finds where something is mentioned; `lint` checks links and frontmatter. Neither needs you to read files. Run `lint` after you add, rename or relink pages.
 {{/tasks}}
+
+History, not rules:
+
+- A `decision` page records a choice, its day and its reason; any other wiki page says what was true on its `updated:` day. Neither binds today's work: what the user asks now comes first, and what the product does today is what the code says.
+- Before you rely on a decision, check its reason against today's code and data (its "Holds while" lines), and say what you found: it holds, it no longer holds, or you could not check it and what would settle it. Only the decisions the work at hand rests on, never the whole vault.
+- When a request goes against a decision that still holds, or looks worse than an alternative you can name, say so once, with the evidence. Then the user decides, and you do the work.
+- Rules are not history: this file and the project's other rules are followed until the user changes them. Say so when one looks wrong.
+- Mention the past only where it changes the answer.
 {{#tasks}}
 
 Tasks:

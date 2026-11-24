@@ -69,7 +69,8 @@ Run commands from the project root. `<skill-dir>` is the directory this SKILL.md
     - A guide exists: add the reports' `Guide:` lines to it, one line per fact under Layout, Patterns, Verify or Gotchas. Replace a line the new fact corrects, and keep the page under 60 lines.
     - No guide: do nothing. A guide is worth starting once several tasks in an area have needed the same facts; if the user asks for one, create `docs/wiki/guide-<area, lowercase>.md` from `docs/.sw/templates/guide.md` and list it in `index.md`.
 11. **File what else was learned.** These are separate offers: act on each only when the user says yes to that one.
-    - A report held a decision or constraint the wiki should keep: offer a wiki page (`type: decision` or `concept`), added to `index.md`.
+    - A report held a decision or constraint the wiki should keep: offer a wiki page, a decision from `docs/.sw/templates/decision.md` with the facts it rests on under "Holds while", or a `concept`, added to `index.md`. A decision that replaces a recorded one names it in `supersedes:`, and the old page gets `status: superseded` and `superseded_by:` in the same change.
+    - A report showed that a recorded decision no longer holds (an implementer's open decision, a reviewer's `important` finding, each with the file and line): say so, and ask whether the decision stands. When the user changes or drops it, offer the page that replaces it, written as the user decided, in the same way.
     - The task fixed a problem whose cause is now known, or the review caught a defect worth remembering: offer a `type: lesson` page (Symptom, Cause, Fix, How to notice it earlier); sw-triage finds these later.
     - A report named follow-up work, or the review left `important` findings open: offer to create the tasks. A finding that lives only in the log is forgotten.
 12. **Report** to the user, in this order. Commit only if the user asks.

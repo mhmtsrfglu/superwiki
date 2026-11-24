@@ -25,7 +25,7 @@ const SYNC = 'node skills/sw-config/scripts/config.mjs sync --tools claude';
 // A scenario's `Role:` names the agent file sw-config writes for it; a `Skill:` names the skill a
 // headless session of the user's own kind runs, from the skills installed in ~/.claude/skills.
 const ROLES = { reviewer: 'sw-reviewer', implementer: 'sw-implementer' };
-const SKILLS = ['triage', 'plan', 'plan-implement', 'implement', 'verify', 'review', 'autopilot'];
+const SKILLS = ['triage', 'plan', 'plan-implement', 'implement', 'verify', 'review', 'autopilot', 'brainstorm', 'search'];
 const GIT_IDENTITY = ['-c', 'user.name=e2e', '-c', 'user.email=e2e@example.com'];
 // Where prepare keeps the hash of the copy's working tree; `.git/` is outside that tree.
 const TREE_FILE = '.git/e2e-tree';

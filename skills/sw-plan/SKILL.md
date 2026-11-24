@@ -40,7 +40,7 @@ The plan is a file under `docs/plans/`, and a task is a file under `docs/tasks/`
    | VS Code Copilot Chat | the same file, `.github/agents/sw-planner.agent.md`. An agent delegates with the `agent` tool to the agents its `agents` list names; how a plain chat session names one is not documented, so ask for the `sw-planner` agent by name, and if the delegation does not run it, the last row |
    | No subagents available, or the agent is not defined | follow `planner.md` yourself, in this session, and tell the user the configured model was not used |
 
-5. **Present the plan and get approval.** Show the user, in a normal message, the planner's `Approach`, its `Questions` (each with the assumed answer as your recommendation), its `Split`, and the path of the plan file so they can read it. Plan mode is not used: a reply can need files written before the plan is shown again. Read the plan file into your own context only if the user asks you about its content.
+5. **Present the plan and get approval.** Show the user, in a normal message, the planner's `Approach`, its `Questions` (each with the assumed answer as your recommendation), its `Challenges`, its `Split`, and the path of the plan file so they can read it. A challenge is shown as the planner gave it, with its evidence: a requirement, or a recorded decision the plan depends on, that today's code or data contradicts. It is a question to the user, whether the requirement or the decision stands as written or changes as the planner suggests, and "as written" is the answer the plan assumes. It is put once; the plan then follows the user's answer. Plan mode is not used: a reply can need files written before the plan is shown again. Read the plan file into your own context only if the user asks you about its content.
 
    Handle the reply in this order:
    1. The user agrees to a split: carry it out first, as "An agreed split" below says.
@@ -52,7 +52,7 @@ The plan is a file under `docs/plans/`, and a task is a file under `docs/tasks/`
 6. **Record**, after approval:
    - in the plan file, change `status: draft` to `status: approved`: read only its frontmatter (the first lines, up to the closing `---`) and change that line with your edit tool;
    - in the task's "Done when", the mark: end each item that `Marks:` in the planner's latest return quotes with " (test)", unless it already ends so. Only that return counts, and `Marks: none` marks nothing;
-   - in the task's "Notes", the answers given in step 5, each with its question;
+   - in the task's "Notes", the answers given in step 5, each with its question; the answer to a challenge with what the code showed, in a few words. Where that answer changes a requirement, rewrite the item in the task file as the user decided, keeping its " (test)" mark if it has one, and add to the end of "Notes" `- Changed <date> at planning, accepted by the user: D<n> was "<old wording>"; reason: <what the code showed>.`, in the shape of sw-implement step 6's line for an accepted difference, so that every role reads one wording; `at planning` tells it from that line, since the requirement changed before the work and the work did not depart from it. Where the user set a recorded decision aside, offer the page that replaces it, from `docs/.sw/templates/decision.md` with `supersedes:`, and the mark on the old page (`status: superseded`, `superseded_by:`); write both only on a yes;
    - in the area guide, if `node docs/.sw/sw.mjs explain <ID>` names one, the planner's `Guide:` lines, one line per fact;
    - in `docs/log.md`, a new entry `## [date] plan | <ID>`, in the layout the log's last entries use.
 
@@ -79,5 +79,6 @@ The planner's `Split:` names, per new task, its title, its dependencies and the 
 - Setting the task to `in-progress`. Planning does not change status; only sw-autopilot marks a task started before planning it.
 - Creating the tasks of a proposed split before the user agrees to it.
 - Approving a revised plan the user has not been shown.
+- Dropping a planner's challenge because the task or a decision page says otherwise. The page says what was chosen on its day; the challenge says what the code shows today, and the user decides between them.
 - Planning several tasks in one plan file. One task, one plan; shared design goes to a `type: decision` wiki page that the plans link.
 - Adding the new task to the list in `index.md` by hand. `index` writes that list from the task files.

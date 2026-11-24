@@ -54,7 +54,7 @@ Tell the user about each of these; act only on what they choose.
 | Left over | Where it is | Options |
 | --- | --- | --- |
 | Rules and conventions written in the old index | `docs/legacy/` | most are replaced by the Superwiki block in `AGENTS.md`; project-specific ones go to `AGENTS.md` outside that block |
-| Milestones, glossaries, decision records in the old index | `docs/legacy/` | turn into `docs/wiki/` pages with `type:` and `summary:`, and list them in `index.md` |
+| Milestones, glossaries, decision records in the old index | `docs/legacy/` | turn into `docs/wiki/` pages with `type:` and `summary:`, and list them in `index.md`. A decision record keeps its date as `date:`; a status saying it was superseded becomes `status: superseded` with `superseded_by:` the replacing page's file name, and that page gets `supersedes:`; any other status is kept as written |
 | Research, specs, decisions in other folders | in place, outside the vault | leave, or move into `raw/` (sources) or `wiki/` (maintained pages) |
 | Plans written by other tools | in place, or in the archive if they were under `docs/plans/` | leave, or turn one into `docs/plans/<ID>-plan.md` when it belongs to exactly one task |
 | The old viewer or scripts that parse the old index | in place | delete once `docs/viewer.html` shows the same numbers |
